@@ -1,10 +1,125 @@
 # 05. QA 검증 리포트 — 대학원 원우회 커뮤니티 앱
 
 > 작성자: QA Engineer 에이전트
-> 작성일: 2026-05-20
-> 입력: 01_pm_requirements.md v0.2 / 02_designer_uiux.md v0.1 / 03_backend_design.md v0.1 / 04_frontend_impl.md v0.1
-> 검증 대상: `supabase/migrations/*` + `app/` + `components/` + `lib/`
+> 작성일: 2026-05-20 (v0.1) · 재검증 2026-05-20 (v0.2)
+> 입력: 01_pm_requirements.md v0.2 / 02_designer_uiux.md v0.1 / 03_backend_design.md v0.2 / 04_frontend_impl.md v0.2
+> 검증 대상: `supabase/migrations/*` (14개) + `app/` + `components/` + `lib/`
 > 방법: **정적 분석** (실 Supabase 인증/Lighthouse 환경 부재). API↔UI shape, RLS↔UI 분기, DB enum↔UI 옵션을 직접 교차 비교.
+
+---
+
+## 재검증 결과 (v0.2) — Backend/Frontend P0 패치 검증
+
+> 재검증일: 2026-05-20
+> 대상 마이그레이션: `20260520000010_*` ~ `20260520000014_*` (5개, add-only)
+> 대상 코드: `lib/types/database.ts`, `lib/supabase/middleware.ts`, `app/(auth)/login/page.tsx`, `components/post/CommentList.tsx`(신규), `app/(main)/board/[id]/page.tsx`, `lib/api/posts.ts`, `lib/api/dues.ts`, `components/dues/DuesEditSheet.tsx`, `components/dues/DuesHistoryCard.tsx`, `app/(main)/dues/admin/items/[id]/unpaid/page.tsx`, `components/dues/UnpaidMemberItem.tsx`
+> 검증 도구: `pnpm typecheck` (0 errors), grep 정적 분석, SQL/TS 교차 리뷰
+
+### 판정 요약
+
+| 이슈 | 영역 | v0.1 상태 | v0.2 판정 | 핵심 증거 |
+|------|------|-----------|-----------|-----------|
+| B-01 | rejected 상태 분리 | FAIL | **RESOLVED** | `enum 'rejected'` 추가 + `reject_membership` 사용 + middleware 분기 + login UI 사유 표시 |
+| B-02 | 댓글 삭제 UI | FAIL | **RESOLVED** | `CommentList.tsx` 신규 + `board/[id]/page.tsx`에서 사용 + `deleteComment` 호출 경로 확인 |
+| B-03 | dues memo_public | FAIL | **RESOLVED** | `memo_public` 컬럼 + 뷰 + 가드 트리거 + `listMyDues` 뷰 사용 + EditSheet 체크박스 |
+| B-04 | list_dues_unpaid v2 | FAIL | **RESOLVED** | RPC v2 시그니처(`p_include_inactive default true`) + `listUnpaid` 전달 + 페이지 active/inactive 섹션 분리 |
+| B-05 | 권한 상승 | FAIL | **RESOLVED** | `guard_profiles_secure_update` BEFORE UPDATE 트리거 + 8개 보호 컬럼 + Frontend 경로에 직접 update 없음 |
+
+### B-05 권한 상승 — 상세 증거
+
+- **트리거 정의**: `supabase/migrations/20260520000012_profiles_secure_update.sql:12-100`
+  - 보호 컬럼: `role`(L32), `status`(L40), `approved_at`(L47), `approved_by`(L50), `rejected_reason`(L55), `rejection_reason`(L58), `is_anonymous_placeholder`(L63), `deleted_at`(L71), `email`(L79), `id`(L86).
+  - 권한 분기: `role` → admin만 변경 가능 (L33), `status`/`approved_*`/`rejected_*`/`rejection_reason` → officer 이상 (L41,48,51,56,59), `is_anonymous_placeholder`/`email` → admin만 (L64,80), `deleted_at` → 본인 또는 officer (L72).
+  - `auth.uid() is null` 인 경우(서비스 롤·일부 SECURITY DEFINER 호출) 통과 — 의도된 fallback (L25-27).
+  - 트리거 등록: `before update on public.profiles for each row` (L98-100) — RLS 통과 직후 실행되어 RLS와 직교(중복 방어).
+- **Frontend grep**: `profiles` 테이블 update 호출은 `lib/api/members.ts:68` `updateMyProfile`만 존재. 인자 타입이 `Partial<Pick<Profile, 'name' | 'lab' | 'phone'>>` (L66)로 role/status 입력 자체가 불가능. 다른 곳에 `from('profiles').update` 호출 없음.
+- **회귀 시뮬레이션**: 일반 회원이 `supabase.from('profiles').update({ role: 'admin' }).eq('id', auth.uid())` 호출 시 → RLS `profiles_update_self` 통과 → 트리거에서 `is_admin()=false`라 `new.role := old.role` → 변경 없음 (오류도 없음, 행 카운트 1 반환). **권한 상승 차단 확인**.
+- **임원도 직접 role 변경 차단**: 임원이 자신/타인 row의 role 직접 update → `is_admin()=false`라 복원. `grant_officer`/`revoke_officer` RPC만 권장 경로. v0.2 §8.4 매트릭스와 일치.
+
+### B-01 rejected 상태 분리 — 상세 증거
+
+- **enum 추가**: `20260520000010_*.sql:20` — `alter type profile_status add value 'rejected' after 'pending'` (idempotent guard L13-19).
+- **RPC 변경**: `20260520000011_*.sql:39` — `reject_membership`이 `status='rejected'` 사용. `rejection_reason`(신규) + `rejected_reason`(레거시) 동시 채움 (L40-41) → DB 백필 호환성 확보 (L17-19).
+- **approve_membership 정리**: 두 reason 컬럼 모두 `null`로 초기화하여 재승인 시 잔여물 제거 (L74-75).
+- **middleware 분기**: `lib/supabase/middleware.ts:84-93` — `rejected | suspended | withdrawn` 모두 `/login?reason=<status>`로 라우팅 (개별 reason 값 전달).
+- **login 페이지 표시**: `app/(auth)/login/page.tsx:12-17` — reason별 라벨 분기. `rejected` 인 경우 L31-51에서 `profiles.rejection_reason` (fallback `rejected_reason`) 조회 및 L62-72에서 사유와 임원 연락 안내 표시.
+- **타입**: `lib/types/database.ts:13` — `ProfileStatus`에 `'rejected'` 추가. L49 profiles Row에 `rejection_reason: string | null` 추가, Insert/Update에도 동일.
+- **알림 일관성**: `reject_membership` RPC가 `notifications` 행 insert (`kind='membership_rejected'`, L49-50).
+
+### B-02 댓글 삭제 UI — 상세 증거
+
+- **신규 파일**: `components/post/CommentList.tsx` 78 라인. 'use client' (L4) + `ConfirmDialog` + `deleteComment` + `router.refresh()` 패턴.
+- **본인 판별**: L54 `const mine = !!currentUserId && currentUserId === c.created_by;` — `comment.created_by`는 `lib/api/posts.ts:26` 정의된 `string | null`. `currentUserId`는 부모에서 `profile?.id ?? null` 전달 (board/[id]/page.tsx:46) → 비교 안전.
+- **삭제 흐름**: `onDelete` 콜백 → `setPendingId(c.id)` → ConfirmDialog 열림 → 확인 → `deleteComment(supabase, id)` → toast → `router.refresh()` (L27-40).
+- **상위 페이지**: `app/(main)/board/[id]/page.tsx:46` — `<CommentList comments={comments} currentUserId={profile?.id ?? null} />` — 빈 상태 / Card 처리는 CommentList 내부로 위임 (L42-48).
+- **RLS 정합**: `comments_delete_self` 정책(L168-170)이 `created_by = auth.uid()` 강제 → UI는 본인만 버튼 노출(CommentItem.tsx:21 `isMine && onDelete`) → 일치.
+- **deleteComment 구현**: `lib/api/posts.ts:120-128` — soft delete(`deleted_at = now()`). 목록은 `is('deleted_at', null)` 필터로 자동 제외 (L98).
+
+### B-03 dues memo_public — 상세 증거
+
+- **컬럼**: `20260520000013_*.sql:14-15` — `add column if not exists memo_public boolean not null default false`. 기존 행은 default로 안전 백필.
+- **뷰**: L23-42 — `dues_payment_member_view` with `security_invoker=true`. memo 마스킹 로직 L37-41: `is_officer()` → 그대로, 본인이고 `memo_public=true` → 그대로, 그 외 → NULL.
+- **권한**: L48 `grant select on ... to authenticated`.
+- **트리거**: L54-79 — `guard_dues_payment_memo` BEFORE UPDATE. 비-officer가 `memo`/`memo_public` 변경 시도 시 옛 값 복원. 기존 RLS `dues_payment_update_officer`(officer만 update 가능, rls:271-274)와 중복 방어.
+- **API**: `lib/api/dues.ts:131-139` — `listMyDues`가 `(supabase as any).from('dues_payment_member_view')` 사용. `as any`는 view 타입 추론 제한 우회용으로, 보안에는 영향 없음 (B-08 P1 대상).
+- **타입**: `lib/types/database.ts:431-447` — `Views.dues_payment_member_view` 정의. `memo: string | null` (마스킹 가능).
+- **EditSheet UI**: `components/dues/DuesEditSheet.tsx:34` 상태 `memoPublic`, L43 row.memo_public으로 초기화, L98-108 체크박스. 메모 비었으면 `disabled` (L104). 저장 시 `memo_public: memoPublic` payload 포함 (L55).
+- **HistoryCard**: `components/dues/DuesHistoryCard.tsx:23-25` — `{row.memo && ...}` 가드. 뷰가 마스킹해서 NULL 반환하면 자동으로 영역 미렌더 → OK.
+- **UpdateDuesPaymentInput**: `lib/api/dues.ts:171-177` — `memo_public?: boolean` 옵셔널. undefined 시 payload 미포함(L193-196) → 기존값 유지.
+
+### B-04 list_dues_unpaid v2 — 상세 증거
+
+- **RPC v2**: `20260520000014_*.sql:14-67`. 시그니처 `(p_dues_term_id uuid, p_include_inactive boolean default true)` L15-17. 반환 컬럼 9개 (v1 6개 → +member_status, +memo, +memo_public, +memo_public... 실제로는 v1이 phone 포함 6개; v2는 member_status/memo_public 추가).
+- **필터 로직** L57-60: `p_include_inactive` true면 모든 비-anonymous, false면 `pr.status = 'active'` 강제. `is_anonymous_placeholder = false` 항상 (L56).
+- **정렬** L62-65: active 우선, 그 다음 cohort_year nulls last, name. 비활동 회원이 뒤로 정렬되어 UI 섹션 분리에도 친화.
+- **권한 가드** L36-38: `is_officer()` 미통과 시 예외. SECURITY DEFINER L32.
+- **타입**: `lib/types/database.ts:451-465` — `Args: { p_dues_term_id: string; p_include_inactive?: boolean }`, Returns에 `member_status: ProfileStatus`, `memo_public: boolean` 포함.
+- **API 호출**: `lib/api/dues.ts:157-169` — `listUnpaid(supabase, termId, includeInactive=true)` 기본 true. `(supabase as any).rpc('list_dues_unpaid', { p_dues_term_id, p_include_inactive })` 전달.
+- **페이지 분리**: `app/(main)/dues/admin/items/[id]/unpaid/page.tsx:15-26` `partition()` 함수, L75-93 활동 회원 섹션, L96-117 비활동 회원 섹션(있을 때만). L28-41 `statusLabel`로 rejected/suspended/withdrawn/pending 한글 매핑. 카운트 요약 L56-63 활동/비활동 분리 표시.
+- **UnpaidMemberItem**: `components/dues/UnpaidMemberItem.tsx:8-11,22-26` — `badge?: string` prop 추가, 인라인 라운드 배지로 렌더.
+
+### v0.1 P0 항목 매트릭스 갱신
+
+- US-03 프로필 등록·수정 — WARN → **PASS** (B-05 트리거로 권한 상승 차단)
+- US-21 댓글 작성·삭제 — FAIL → **PASS** (B-02 UI 연결)
+- US-41 내 납부 내역 — WARN → **PASS** (B-03 뷰 마스킹)
+- US-42 임원 납부 상태 토글 — WARN → **PASS** (memo_public 분리; partial은 P1 미해결로 유지)
+- US-43 미납자 목록 — WARN → **PASS** (B-04 inactive 포함)
+- US-50 가입 승인/반려 — FAIL → **PASS** (B-01 분리)
+
+### 회귀 검토
+
+- `pnpm typecheck` → **0 errors** (전·후 동일).
+- `as any` 캐스트는 view 타입 추론 한계(B-08 P1)와 RPC 제네릭 한계 회피용. RLS는 DB에서 강제되므로 **런타임 보안 영향 없음**. 다만 컬럼명/payload 오타를 타입체크가 못 잡는 위험은 그대로 → B-08로 이관.
+- v0.1 RLS 정책과 v0.2 트리거 충돌: 트리거는 RLS 통과 후(`BEFORE UPDATE`) 실행되므로 직교. RLS가 막은 행은 트리거에 도달하지도 않고, RLS가 허용한 행은 트리거가 컬럼 단위 추가 검증을 수행. **충돌 없음**.
+- 뷰 `dues_payment_member_view`는 `security_invoker=true`라 RLS가 적용됨 → 본인 행(`dues_payment_select_self`)만 SELECT 가능. 임원은 `dues_payment_select_officer`로 전체 SELECT 가능하지만 매트릭스 UI는 view가 아닌 raw 테이블을 직접 조회하므로 영향 없음.
+- middleware 변경에 따른 부작용: `rejected` 사용자가 임의 페이지 접근 → `/login?reason=rejected` 리다이렉트, 세션은 유지된 상태로 login 페이지가 `getUser()`로 profile 조회 (login/page.tsx:34-42). 인증 쿠키는 그대로이므로 동작 가능. 단 사용자가 `로그아웃` 버튼을 누를 필요가 있는 흐름(또는 `signOut` 자동) — 명세상 명시 안 됨, P2 UX 검토 권장.
+- `reject_membership` 시그니처(`uuid, text`) 그대로 → Frontend `rejectMember` 호출(members.ts:51-61) 정합 OK.
+- `approve_membership`이 `rejection_reason` 초기화 추가 — Frontend는 결과 사용 안 함, 호환.
+
+### 새로 발견된 회귀 이슈
+
+| ID | 우선 | 내용 | 위치 |
+|----|------|------|------|
+| R-01 | P2 | `dues_payment_member_view`가 `security_invoker=true`인데 `is_officer()`는 SECURITY DEFINER. 회원이 본인 행을 뷰로 조회 시 RLS는 본인 행만 노출, view의 case 표현식의 `is_officer()` 호출은 invoker 권한으로 `auth.uid()` 평가 → 일반 회원이면 false. **정상 동작**. 그러나 임원이 본인 행을 뷰로 조회하면 매트릭스 RLS와 별개로 본인 행도 보임 — 영향 없음. 이슈 아님으로 종결. (점검 결과 기록용) | — |
+| R-02 | P3 | `listMyDues`가 `(supabase as any).from(...)` 캐스트 — view 타입은 정의돼 있으나 supabase-js generic이 Views를 일부 표현에서 인식 못 함. 향후 자동 타입 도입 시 정리. | `lib/api/dues.ts:131` |
+| R-03 | P2 | `app/(auth)/login/page.tsx:33-50` 가 reason=rejected 케이스에서 `getUser()`로 세션이 있을 때만 reason 조회. 사용자가 다른 디바이스에서 로그아웃되거나 세션이 만료되면 사유가 노출되지 않고 라벨만 표시 — 의도된 동작이지만 사용성 향상 위해 reject 이벤트 시점에 이메일/푸시로 사유 전달 권장 (P1: B-01 후속). | — |
+
+회귀 이슈 모두 P0/P1 없음.
+
+### 최종 배포 적합성 (v0.2)
+
+**조건부 적합** — 정적 분석상 P0 5건 모두 해결. 다만 다음 런타임 검증이 스테이징 환경에서 완료되어야 운영 적합:
+
+1. **트리거 동작 확인**: 일반 회원 토큰으로 `update profiles set role='admin'` 호출 → 실제로 role이 그대로인지.
+2. **rejected 흐름 E2E**: 가입 → 반려 → 재로그인 시 `/login?reason=rejected` + 사유 노출.
+3. **memo_public 토글**: 임원이 비공개 메모 등록 후 회원이 본인 화면(SCR-050)에서 메모 영역이 안 보이는지.
+4. **list_dues_unpaid v2**: 정지/탈퇴 회원의 미납 행이 inactive 섹션에 표시되는지. CSV 내보내기(P1) 도입 시 member_status 컬럼 포함 여부.
+5. **댓글 삭제**: 본인 댓글 삭제 버튼 클릭 → ConfirmDialog → 삭제 → 리스트에서 사라지고 comment_count 감소.
+
+P1/P2 이슈(B-06~B-18) 상태는 v0.1 그대로. P1은 다음 스프린트 권장.
+
+---
 
 ## 환경 제약 명시
 - Lighthouse·실제 Supabase 인증 환경 사용 불가 → 정적 분석으로 대체.
@@ -17,22 +132,24 @@
 
 P0 사용자 스토리 × 검증 카테고리. 상태: **PASS** / **FAIL** / **WARN** (정적 분석상 합리적이나 런타임 검증 필요) / **SKIP** (환경 부재).
 
+> v0.2 갱신: B-01/B-02/B-03/B-04/B-05 해결로 다음 행 종합 상태가 변경되었다. (괄호 안 v0.1 → v0.2)
+
 | US | 스토리 | 기능 | 권한(RLS↔UI) | 모바일 | 접근성 | 한국어/IME | 종합 |
 |----|--------|------|--------------|--------|--------|------------|------|
 | US-01 | 가입 신청(승인제) | PASS | PASS | PASS | WARN(label) | PASS | **WARN** |
 | US-02 | 로그인 | PASS | PASS | PASS | PASS | PASS | **PASS** |
-| US-03 | 프로필 등록·수정 | PASS | WARN(role/status 직접 update 차단 부재) | PASS | PASS | PASS | **WARN** |
+| US-03 | 프로필 등록·수정 | PASS | PASS (v0.2 트리거) | PASS | PASS | PASS | **PASS** (WARN→PASS) |
 | US-10 | 임원 공지 CRUD | PASS | PASS | PASS | WARN(ConfirmDialog 포커스 트랩) | PASS | **WARN** |
 | US-11 | 공지 목록·상세 | PASS | PASS | PASS | PASS | PASS | **PASS** |
 | US-20 | 게시판 글 CRUD | WARN(글 수정 라우트 부재) | PASS | PASS | PASS | PASS | **WARN** |
-| US-21 | 댓글 작성·삭제 | FAIL(댓글 삭제 UI 미연결) | WARN(comment delete RLS+routing 누락) | PASS | PASS | PASS | **FAIL** |
+| US-21 | 댓글 작성·삭제 | PASS (v0.2 UI 연결) | PASS | PASS | PASS | PASS | **PASS** (FAIL→PASS) |
 | US-30 | 일정 등록 | PASS | PASS | PASS | PASS | PASS | **PASS** |
 | US-31 | 일정 목록·캘린더 | PASS | PASS | PASS | WARN(SegmentedControl role=tab인데 tabpanel 누락) | PASS | **WARN** |
 | US-40 | 회비 항목 CRUD | PASS | PASS | PASS | PASS | PASS | **PASS** |
-| US-41 | 내 납부 내역 | PASS | PASS | PASS | WARN(메모 공개 정책 미구현) | PASS | **WARN** |
-| US-42 | 임원 납부 상태 토글+메모 | WARN(memo 공개 분리 부재, partial 미노출) | PASS | PASS | PASS | PASS | **WARN** |
-| US-43 | 미납자 목록 | WARN(active 회원만, 정지/탈퇴 미반영) | PASS | PASS | PASS | PASS | **WARN** |
-| US-50 | 가입 승인/반려 | FAIL(반려 시 status=suspended → 로그인 차단됨) | FAIL(반려와 정지 구분 불가) | PASS | PASS | PASS | **FAIL** |
+| US-41 | 내 납부 내역 | PASS | PASS (v0.2 뷰 마스킹) | PASS | PASS | PASS | **PASS** (WARN→PASS) |
+| US-42 | 임원 납부 상태 토글+메모 | PASS (memo_public 분리; partial은 P1 잔존) | PASS | PASS | PASS | PASS | **PASS** (WARN→PASS) |
+| US-43 | 미납자 목록 | PASS (v0.2 inactive 포함) | PASS | PASS | PASS | PASS | **PASS** (WARN→PASS) |
+| US-50 | 가입 승인/반려 | PASS (rejected 분리) | PASS | PASS | PASS | PASS | **PASS** (FAIL→PASS) |
 
 성능(LCP), Lighthouse, 실 RLS 거부 시나리오는 SKIP.
 
@@ -42,7 +159,9 @@ P0 사용자 스토리 × 검증 카테고리. 상태: **PASS** / **FAIL** / **W
 
 ### P0 (즉시 수정 권장 — 사용자 영향 또는 보안)
 
-#### B-01. 반려된 회원이 `suspended`로 분류되어 로그인 차단 — `reject_membership` ↔ middleware
+> **v0.2 결과**: B-01/B-02/B-03/B-04/B-05 5건 모두 **RESOLVED** (재검증 결과 섹션 참조). 아래 본문은 v0.1 원본 진단을 감사 추적용으로 보존.
+
+#### B-01. 반려된 회원이 `suspended`로 분류되어 로그인 차단 — `reject_membership` ↔ middleware (v0.2 RESOLVED)
 - 명세: PM §3.1 US-50 "임원이 가입 신청자를 승인/반려한다."
 - 현황:
   - `supabase/migrations/20260520000009_rpc_helpers.sql:94` — `update public.profiles set status = 'suspended', rejected_reason = p_reason ...`
@@ -51,13 +170,13 @@ P0 사용자 스토리 × 검증 카테고리. 상태: **PASS** / **FAIL** / **W
 - 영향: 반려된 신청자가 "정지" 메시지를 보고 혼란. 또한 차후 재가입을 위한 데이터 흐름(같은 이메일로 재가입 시 `auth.users` 충돌)이 정의되지 않음.
 - 권장: `profile_status` enum에 `'rejected'` 추가하거나(Backend), middleware에서 `rejected_reason` 유무로 분기하여 별도 안내 페이지(SCR-신설)로 라우팅(Frontend). PM이 정책 결정 필요.
 
-#### B-02. 본인 댓글 삭제 UI 미연결 — DB·RLS는 허용하나 트리거가 없음
+#### B-02. 본인 댓글 삭제 UI 미연결 — DB·RLS는 허용하나 트리거가 없음 (v0.2 RESOLVED)
 - 명세: `components/post/CommentItem.tsx:7-9` — `onDelete?: () => void` props 정의됨
 - 현황: `app/(main)/board/[id]/page.tsx:50-57` — `<CommentItem ... isMine={profile?.id === c.created_by} />` 호출 시 **`onDelete`를 넘기지 않음**
 - 영향: P0 US-21 "댓글 작성·삭제" 중 삭제 동작 불가. RLS는 `comments_delete_self` (rls_policies.sql:168-170)로 허용되고 API에 `deleteComment` (lib/api/posts.ts:120) 함수도 존재하지만 UI에서 호출되지 않음.
 - 권장: 게시글 상세 페이지에서 본인 댓글 삭제 버튼을 활성화. 삭제 시 낙관적 업데이트 + `router.refresh()`.
 
-#### B-03. `dues_payment.memo_public` 컬럼 부재 → 메모 노출 정책 위반 위험
+#### B-03. `dues_payment.memo_public` 컬럼 부재 → 메모 노출 정책 위반 위험 (v0.2 RESOLVED)
 - 명세:
   - Designer `02_designer_uiux.md:417` — "☐ 회원에게 메모 공개" 체크박스
   - Designer `02_designer_uiux.md:969` — "회비 메모는 '공개' 체크 안 한 경우 회원 화면(SCR-050)에 노출 금지"
@@ -68,12 +187,12 @@ P0 사용자 스토리 × 검증 카테고리. 상태: **PASS** / **FAIL** / **W
 - 영향: 임원이 회원 내부용 메모(예: "추후 면제 요청 가능성, 면담 필요")를 남기면 회원이 그대로 봄. **개인정보·신뢰 이슈**.
 - 권장: Backend가 `memo_public boolean default false` 추가 + RLS view 또는 SECURITY DEFINER 함수로 회원 화면에는 `memo_public=true`인 메모만 노출. 또는 `memo_private` / `memo_public` 두 컬럼 분리.
 
-#### B-04. `list_dues_unpaid` RPC가 `active` 회원만 → 정지/탈퇴 회원 미납 누락
+#### B-04. `list_dues_unpaid` RPC가 `active` 회원만 → 정지/탈퇴 회원 미납 누락 (v0.2 RESOLVED)
 - 현황: `supabase/migrations/20260520000009_rpc_helpers.sql:45-46` — `where dp.dues_term_id = ... and dp.status = 'unpaid' and pr.status = 'active'`
 - 영향: 학기 중 회원이 탈퇴/정지 처리되면, 해당 회원의 미납 채권이 미납자 목록에서 사라져 운영 누락 가능. 또한 `dues_payment.member_id`는 `on delete restrict`이므로 행은 보존되지만 RPC가 가림.
 - 권장: 임원 운영 정책 확인 후 (a) 정지/탈퇴 회원 별도 섹션 표시 또는 (b) 필터 옵션 추가. PM 정책 결정 필요.
 
-#### B-05. `profiles.role` / `profiles.status` 직접 update 차단 부재 → 권한 상승 가능성
+#### B-05. `profiles.role` / `profiles.status` 직접 update 차단 부재 → 권한 상승 가능성 (v0.2 RESOLVED)
 - 명세: Backend `03_backend_design.md:436-437` — "RLS 정책 `profiles_update_self`가 with check에 컬럼 제한이 없음. 앱 레이어 검증 필요 또는 column-level RLS 추가."
 - 현황:
   - `supabase/migrations/20260520000008_rls_policies.sql:66-69` — `profiles_update_self`는 단지 `id = auth.uid()` 만 강제 → 본인 행의 `role`/`status`를 임의 값으로 update 가능
