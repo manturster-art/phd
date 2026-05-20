@@ -9,7 +9,8 @@
 // =====================================================================
 
 export type UserRole = 'member' | 'officer' | 'admin';
-export type ProfileStatus = 'pending' | 'active' | 'suspended' | 'withdrawn';
+// v0.2: 'rejected' 추가 — 가입 반려를 정지(suspended)와 분리.
+export type ProfileStatus = 'pending' | 'active' | 'rejected' | 'suspended' | 'withdrawn';
 export type PostCategory = 'general' | 'question' | 'share' | 'recruit';
 export type RsvpStatus = 'going' | 'not_going' | 'maybe';
 export type DuesStatus = 'unpaid' | 'paid' | 'exempt' | 'partial';
@@ -45,6 +46,7 @@ export interface Database {
           approved_at: string | null;
           approved_by: string | null;
           rejected_reason: string | null;
+          rejection_reason: string | null;
           is_anonymous_placeholder: boolean;
           created_at: string;
           updated_at: string;
@@ -63,6 +65,7 @@ export interface Database {
           approved_at?: string | null;
           approved_by?: string | null;
           rejected_reason?: string | null;
+          rejection_reason?: string | null;
           is_anonymous_placeholder?: boolean;
           created_at?: string;
           updated_at?: string;
@@ -81,6 +84,7 @@ export interface Database {
           approved_at?: string | null;
           approved_by?: string | null;
           rejected_reason?: string | null;
+          rejection_reason?: string | null;
           is_anonymous_placeholder?: boolean;
           updated_at?: string;
           deleted_at?: string | null;
@@ -308,6 +312,7 @@ export interface Database {
           status: DuesStatus;
           paid_amount_krw: number | null;
           memo: string | null;
+          memo_public: boolean;
           paid_at: string | null;
           updated_by: string | null;
           created_at: string;
@@ -320,6 +325,7 @@ export interface Database {
           status?: DuesStatus;
           paid_amount_krw?: number | null;
           memo?: string | null;
+          memo_public?: boolean;
           paid_at?: string | null;
           updated_by?: string | null;
           created_at?: string;
@@ -332,6 +338,7 @@ export interface Database {
           status?: DuesStatus;
           paid_amount_krw?: number | null;
           memo?: string | null;
+          memo_public?: boolean;
           paid_at?: string | null;
           updated_by?: string | null;
           updated_at?: string;
@@ -421,18 +428,38 @@ export interface Database {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      // v0.2: 회원용 회비 조회 뷰. memo는 memo_public=true 이거나 임원일 때만 노출(아니면 NULL).
+      dues_payment_member_view: {
+        Row: {
+          id: string;
+          dues_term_id: string;
+          member_id: string;
+          status: DuesStatus;
+          paid_amount_krw: number | null;
+          paid_at: string | null;
+          updated_at: string;
+          created_at: string;
+          memo_public: boolean;
+          memo: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
+      // v0.2: p_include_inactive 옵셔널 파라미터 추가, 반환 컬럼에 member_status/memo_public 포함.
       list_dues_unpaid: {
-        Args: { p_dues_term_id: string };
+        Args: { p_dues_term_id: string; p_include_inactive?: boolean };
         Returns: Array<{
           member_id: string;
           name: string;
           cohort_year: number | null;
           lab: string | null;
           phone: string | null;
+          member_status: ProfileStatus;
           status: DuesStatus;
           memo: string | null;
+          memo_public: boolean;
           updated_at: string;
         }>;
       };

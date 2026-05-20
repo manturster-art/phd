@@ -6,9 +6,11 @@ import type { UnpaidMember } from '@/lib/api/dues';
 
 interface Props {
   member: UnpaidMember;
+  // v0.2: 비활동 회원 섹션에서 상태 배지(정지/탈퇴/반려) 표시.
+  badge?: string;
 }
 
-export function UnpaidMemberItem({ member }: Props) {
+export function UnpaidMemberItem({ member, badge }: Props) {
   const toast = useToast();
   return (
     <div className="border-b border-border px-4 py-3 last:border-b-0">
@@ -16,6 +18,11 @@ export function UnpaidMemberItem({ member }: Props) {
         {member.name}
         {member.cohort_year != null && (
           <span className="ml-2 text-xs text-text-secondary">· {member.cohort_year}학번</span>
+        )}
+        {badge && (
+          <span className="ml-2 inline-flex items-center rounded-full bg-bg-subtle px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+            {badge}
+          </span>
         )}
       </p>
       {member.lab && (

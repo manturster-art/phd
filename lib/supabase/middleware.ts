@@ -80,7 +80,12 @@ export async function updateSession(request: NextRequest) {
       url.pathname = '/signup/pending';
       return NextResponse.redirect(url);
     }
-    if (profile?.status === 'suspended' || profile?.status === 'withdrawn') {
+    // v0.2: rejected 는 별도 reason 으로 분리 (suspended 와 다른 안내 표시).
+    if (
+      profile?.status === 'rejected' ||
+      profile?.status === 'suspended' ||
+      profile?.status === 'withdrawn'
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = '/login';
       url.searchParams.set('reason', profile.status);

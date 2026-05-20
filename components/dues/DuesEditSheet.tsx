@@ -30,6 +30,8 @@ const STATUS_OPTIONS: { value: DuesStatus; label: string; tone: string }[] = [
 export function DuesEditSheet({ open, row, termLabel, officerId, onClose }: Props) {
   const [status, setStatus] = useState<DuesStatus>('unpaid');
   const [memo, setMemo] = useState('');
+  // v0.2 B-03: 회원에게 메모 공개 여부.
+  const [memoPublic, setMemoPublic] = useState(false);
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   const router = useRouter();
@@ -38,6 +40,7 @@ export function DuesEditSheet({ open, row, termLabel, officerId, onClose }: Prop
     if (row) {
       setStatus(row.status);
       setMemo(row.memo ?? '');
+      setMemoPublic(row.memo_public ?? false);
     }
   }, [row]);
 
@@ -46,7 +49,12 @@ export function DuesEditSheet({ open, row, termLabel, officerId, onClose }: Prop
     const supabase = createClient();
     startTransition(async () => {
       try {
-        await updateDuesPayment(supabase, row.id, { status, memo: memo || null }, officerId);
+        await updateDuesPayment(
+          supabase,
+          row.id,
+          { status, memo: memo || null, memo_public: memoPublic },
+          officerId
+        );
         toast.show('저장되었어요', 'success');
         router.refresh();
         onClose();
@@ -86,6 +94,21 @@ export function DuesEditSheet({ open, row, termLabel, officerId, onClose }: Prop
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
         />
+        {/* v0.2 B-03: 메모 공개 여부. 기본은 임원 내부 메모(비공개). */}
+        <label className="flex min-h-[44px] items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            className="h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+            checked={memoPublic}
+            onChange={(e) => setMemoPublic(e.target.checked)}
+            disabled={!memo.trim()}
+            aria-describedby="memo-public-hint"
+          />
+          <span>회원에게 메모 공개</span>
+        </label>
+        <p id="memo-public-hint" className="-mt-2 text-xs text-text-secondary">
+          체크 해제 시 임원 내부 메모로만 보입니다. 메모가 비어 있으면 비활성화됩니다.
+        </p>
         <div className="flex justify-end gap-2 pt-2">
           <Button variant="secondary" onClick={onClose}>취소</Button>
           <Button onClick={save} loading={pending}>저장</Button>

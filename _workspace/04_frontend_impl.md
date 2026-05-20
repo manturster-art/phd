@@ -229,3 +229,60 @@ QA·Backend에게 전달:
 1. **회비 관리 (SCR-060/061/062/063)** — 가장 복잡한 도메인. 권한 분기, RPC 호출, BottomSheet 상태, 모바일/데스크톱 두 가지 매트릭스 뷰. 데이터 양이 늘었을 때 정렬/필터/검색 IME 동작 함께 검증 필요.
 2. **인증/온보딩 흐름 (SCR-001/002/003 + middleware)** — pending 상태 라우팅 가드가 핵심. 새 가입자가 첫 로그인 시 /signup/pending으로 강제 이동, 승인 후 다음 로그인에서 / 로 진입하는지. middleware의 profiles 조회가 매 요청 발생 — 캐시·성능 영향.
 3. **댓글 등록 + 게시글 카운트 동기화 (SCR-031)** — Backend 트리거(`sync_post_comment_count`)와 Frontend `router.refresh()` 타이밍. 낙관적 업데이트 미적용 상태이므로 응답 지연 시 UX 어색함 가능. IME 조합 중 Enter 입력 처리도 함께 확인.
+
+---
+
+## 11. v0.2 변경 (Backend v0.2 동기화 + QA P0 대응)
+
+> 작성일: 2026-05-20
+> 기반: `_workspace/05_qa_report.md` (P0 이슈) + `_workspace/03_backend_design.md` v0.2 + 마이그레이션 `20260520000010~14`
+> 결과: `pnpm typecheck` 0 errors / `pnpm build` 성공 (23개 라우트).
+
+### 11.1 변경 로그
+| 날짜 | 버전 | 변경 |
+|------|------|------|
+| 2026-05-20 | v0.2 | Backend v0.2 동기화 (rejected enum, dues_payment_member_view, memo_public, list_dues_unpaid v2) + QA P0 B-02 본인 댓글 삭제 UI 연결 |
+
+### 11.2 수정/추가 파일 매트릭스
+
+| 이슈 | 파일 | 변경 요약 |
+|------|------|----------|
+| B-01 | `lib/types/database.ts` | `ProfileStatus`에 `'rejected'` 추가. `profiles` Row/Insert/Update에 `rejection_reason: string \| null` 추가. |
+| B-01 | `lib/supabase/middleware.ts` | `status === 'rejected'` 분기를 별도로 처리 — 기존 suspended/withdrawn 와 함께 `/login?reason=<status>` 로 리다이렉트하되 reason 값을 그대로 전달. |
+| B-01 | `app/(auth)/login/page.tsx` | `reason`별 라벨 분기 (`rejected`/`suspended`/`withdrawn`). `reason=rejected` 인 경우 서버 컴포넌트에서 본인 `profiles.rejection_reason` (rejected_reason 백업 fallback)을 조회해 "사유: …" 안내 + 임원 연락 안내 표시. |
+| B-02 | `components/post/CommentList.tsx` (신규) | 본인 댓글 삭제 클라이언트 래퍼. `ConfirmDialog` + `deleteComment` + `router.refresh()` 처리. 본인 댓글에만 `onDelete` 핸들러 전달. |
+| B-02 | `app/(main)/board/[id]/page.tsx` | 댓글 렌더링을 `CommentList`로 위임. 빈 상태/Card 처리도 컴포넌트 내부로 이동. |
+| B-03 | `lib/types/database.ts` | `dues_payment` Row/Insert/Update에 `memo_public: boolean` 추가. `Views.dues_payment_member_view` 신규 정의 (memo는 마스킹 가능하므로 nullable). |
+| B-03 | `lib/api/dues.ts` | `MyDuesRow.memo_public` 추가. `listMyDues`가 `dues_payment_member_view` 사용 (memo 마스킹 자동). `DuesMatrixRow.memo_public` 추가. `UpdateDuesPaymentInput`에 `memo_public?: boolean` 추가. `updateDuesPayment` 호출자가 미전송 시 기존값 유지. |
+| B-03 | `components/dues/DuesEditSheet.tsx` | "회원에게 메모 공개" 체크박스 추가. 메모가 비어 있으면 비활성화. 저장 시 `memo_public`을 페이로드에 포함. |
+| B-03 | `components/dues/DuesHistoryCard.tsx` | (변경 없음) — 이미 `{row.memo && ...}` 로 null 가드. view가 비공개 메모를 NULL로 마스킹하므로 자동으로 영역이 숨겨짐. |
+| B-04 | `lib/types/database.ts` | `Functions.list_dues_unpaid`의 Args에 `p_include_inactive?: boolean` 추가. Returns에 `member_status: ProfileStatus`, `memo_public: boolean` 추가. |
+| B-04 | `lib/api/dues.ts` | `UnpaidMember.member_status` / `.memo_public` 추가. `listUnpaid(termId, includeInactive=true)` 시그니처 변경 — RPC에 `p_include_inactive` 전달. |
+| B-04 | `app/(main)/dues/admin/items/[id]/unpaid/page.tsx` | `partition()`으로 `member_status==='active'`/그 외로 분리해 "활동 회원" / "비활동 회원" 섹션 렌더. 비활동 회원에는 상태 라벨(반려/정지/탈퇴/대기) 배지 표시. 카운트 요약에도 (활동 N명, 비활동 N명) 추가. |
+| B-04 | `components/dues/UnpaidMemberItem.tsx` | `badge?: string` prop 추가 — 비활동 섹션에서 상태 표시. |
+| B-05 | `components/admin/ApprovalRequestCard.tsx` | 변경 없음 — 이미 `approve_membership` / `reject_membership` RPC 호출. 직접 update 경로 부재 확인. |
+| B-05 | `lib/api/members.ts` | 변경 없음 — `approveMember` / `rejectMember`가 RPC 사용. `updateMyProfile`은 `name/lab/phone`만 update (role/status 제외 확인). |
+| B-05 | `app/(main)/me/edit/ProfileEditor.tsx` | 변경 없음 — 폼 필드에 role/status 없음. 트리거(`guard_profiles_secure_update`)가 추가 안전망. |
+
+### 11.3 비고
+
+- **B-05 직접 update 경로 부재**: 정적 grep 결과 `lib/api/*.ts`와 컴포넌트 어디에도 `profiles`의 `role`/`status` 직접 update 호출 없음. Backend 트리거가 다층 방어로 차단하므로 추가 코드 변경 없음. ProfileEditor 폼 필드는 `name/lab/phone`만 보유.
+- **`partial` 상태 (B-09)**: P1 — 이번 변경에 포함하지 않음. v0.2는 P0 이슈만 처리.
+- **focus trap / 게시글 수정 라우트 / 모바일 터치 타겟 (B-11~B-13, 4.6)**: P1 — 차후 스프린트.
+- **타입 자동 생성 (B-08)**: 실 Supabase 프로젝트 셋업 후 별도 작업.
+
+### 11.4 검증
+
+```
+pnpm typecheck   →  0 errors
+pnpm build       →  ✓ 23개 라우트 컴파일 성공
+                    (정적 5, 동적 18)
+```
+
+- 라우트 그래프 변화 없음 (`/dues/admin/items/[id]/unpaid` 그대로).
+- Middleware bundle size 그대로 (82.1kB).
+- `view`를 쓰는 `listMyDues`는 `as any` 캐스트 1회 추가 (database 타입의 View 추론이 supabase-js v2.106에서 부족). B-08 해결 시 함께 정리.
+
+### 11.5 남은 P0 미해결 없음
+
+QA가 P0로 분류한 B-01/B-02/B-03/B-04/B-05 5건 모두 Backend(v0.2 마이그레이션) + Frontend(이번 변경)로 종결.

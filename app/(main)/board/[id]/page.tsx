@@ -1,11 +1,9 @@
 // SCR-031 게시글 상세
 import { notFound } from 'next/navigation';
 import { AppBar } from '@/components/layout/AppBar';
-import { Card } from '@/components/ui/Card';
-import { EmptyState } from '@/components/ui/EmptyState';
 import { createClient } from '@/lib/supabase/server';
 import { getPost, listComments } from '@/lib/api/posts';
-import { CommentItem } from '@/components/post/CommentItem';
+import { CommentList } from '@/components/post/CommentList';
 import { CommentComposer } from '@/components/post/CommentComposer';
 import { PostMenu } from './PostMenu';
 import { getCurrentProfile } from '@/lib/utils/auth';
@@ -44,19 +42,8 @@ export default async function PostDetailPage({ params }: { params: { id: string 
       <section className="pt-4 pb-24">
         <p className="px-1 text-sm font-semibold">💬 댓글 ({post.comment_count})</p>
         <div className="mt-2">
-          {comments.length === 0 ? (
-            <Card><EmptyState title="첫 댓글을 남겨보세요" /></Card>
-          ) : (
-            <Card>
-              {comments.map((c) => (
-                <CommentItem
-                  key={c.id}
-                  comment={c}
-                  isMine={profile?.id === c.created_by}
-                />
-              ))}
-            </Card>
-          )}
+          {/* v0.2 B-02: 본인 댓글 삭제 UI 연결 */}
+          <CommentList comments={comments} currentUserId={profile?.id ?? null} />
         </div>
       </section>
 
