@@ -286,3 +286,39 @@ pnpm build       →  ✓ 23개 라우트 컴파일 성공
 ### 11.5 남은 P0 미해결 없음
 
 QA가 P0로 분류한 B-01/B-02/B-03/B-04/B-05 5건 모두 Backend(v0.2 마이그레이션) + Frontend(이번 변경)로 종결.
+
+---
+
+## 12. 데모 모드 (`/demo/*`) — 2026-05-20 추가
+
+### 12.1 목적
+Supabase 미연결 환경에서도 모든 핵심 화면을 브라우저로 시연할 수 있도록 `/demo` 라우트 트리를 추가. 로그인/세션·DB·인증을 우회하고 정적 mock 데이터로 컴포넌트만 렌더한다.
+
+### 12.2 라우트 (13개)
+- `/demo` — 데모 진입 카드 그리드 (SCR ID + 역할 배지)
+- `/demo/login` (SCR-001) · `/demo/signup` (SCR-002) · `/demo/pending` (SCR-003)
+- `/demo/home` (SCR-010)
+- `/demo/notices` (SCR-020) · `/demo/notices/sample` (SCR-021)
+- `/demo/board` (SCR-030, 탭 인터랙티브) · `/demo/board/sample` (SCR-031)
+- `/demo/calendar` (SCR-040, 리스트/캘린더 토글)
+- `/demo/dues-member` (SCR-050) · `/demo/dues-admin` (SCR-060, 임원 권한 배지)
+- `/demo/approvals` (SCR-080, 임원 권한 배지)
+
+### 12.3 구조
+- `middleware.ts` 상단에 `/demo` 경로 통과 가드 추가 (Supabase 세션 미검사).
+- `app/demo/layout.tsx` — 상단 노란색 데모 배너, 좌측(lg+) 사이드바, 하단 5탭(`DemoBottomTabBar`).
+- `components/layout/DemoBottomTabBar.tsx` / `DemoSidebar.tsx` — 모든 링크가 `/demo/*` 하위.
+- `components/demo/*` — 기존 컴포넌트의 데모 변형 (NoticeCard/PostListItem 은 `/demo/...` 로 링크, EventListItem 은 alert 노출, CommentComposer 는 alert 만).
+- `lib/demo/mockData.ts` — 한국어 mock 데이터(공지 5, 게시글 5, 댓글 4, 일정 4, 회비 학기 3 + 회원 5명 매트릭스, 가입 대기 3). 기준 시각 2026-05-20 KST.
+
+### 12.4 인터랙션 제약
+- 로그인/가입 폼: submit 시 alert 후 가입 화면에서는 `/demo/pending` 으로 navigate, 로그인은 그대로 머묾.
+- 게시글/일정 항목 클릭: 상세 페이지가 SCR-031 / SCR-021 sample 한 건뿐이므로 일정 항목은 alert 로 대체, 게시글/공지 카드는 sample 페이지로 이동.
+- 회비 매트릭스 셀 클릭: 상태 변경 시트 대신 alert (시트의 디자인은 실 라우트에서 확인).
+- 가입 승인/반려: alert 안내만.
+
+### 12.5 검증
+```
+pnpm typecheck   →  0 errors
+pnpm build       →  ✓ 41개 라우트 (기존 28개 + 데모 13개), 데모는 모두 ○(Static)
+```
