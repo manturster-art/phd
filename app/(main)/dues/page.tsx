@@ -47,7 +47,18 @@ export default async function DuesPage() {
             />
           </Card>
         ) : (
-          <Card>{rows.map((r) => <DuesHistoryCard key={r.id} row={r} />)}</Card>
+          <Card>
+            {rows.map((r) => (
+              // v0.3: 항목 상세(SCR-051) 진입.
+              <Link
+                key={r.id}
+                href={`/dues/${r.id}`}
+                className="block hover:bg-bg transition-colors"
+              >
+                <DuesHistoryCard row={r} />
+              </Link>
+            ))}
+          </Card>
         )}
       </div>
     </>

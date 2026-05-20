@@ -44,7 +44,14 @@ export default function DemoDuesMemberPage() {
         ) : (
           <Card>
             {rows.map((r) => (
-              <DuesHistoryCard key={r.id} row={r} />
+              // v0.3: 상세 페이지(SCR-051) 로 이동.
+              <Link
+                key={r.id}
+                href={`/demo/dues-member/${r.id}`}
+                className="block hover:bg-bg transition-colors"
+              >
+                <DuesHistoryCard row={r} />
+              </Link>
             ))}
           </Card>
         )}

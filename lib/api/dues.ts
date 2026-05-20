@@ -1,5 +1,11 @@
 import type { TypedSupabaseClient } from '@/lib/supabase/types';
-import type { DuesStatus, ProfileStatus } from '@/lib/types/database';
+import type {
+  DuesStatus,
+  DuesMatchSource,
+  DuesSourceBank,
+  DuesMatchType,
+  ProfileStatus,
+} from '@/lib/types/database';
 
 export interface DuesTermItem {
   id: string;
@@ -199,3 +205,165 @@ export async function updateDuesPayment(
     .eq('id', id);
   if (error) throw error;
 }
+
+// =====================================================================
+// v0.3 (06_backend): 회비 입금 신고/컨펌/CSV 매칭 API 호출 함수.
+// =====================================================================
+
+// 회원: 본인 행에 입금 신고 (unpaid → pending_payment). RLS+가드 트리거 보호.
+export async function reportMyDuesPayment(
+  supabase: TypedSupabaseClient,
+  paymentId: string,
+  input: {
+    reportedAt: string;
+    reportedAmount: number;
+    reportedMemo?: string | null;
+  }
+) {
+  const { data, error } = await (supabase.from('dues_payment') as any)
+    .update({
+      status: 'pending_payment',
+      reported_at: input.reportedAt,
+      reported_amount: input.reportedAmount,
+      reported_memo: input.reportedMemo ?? null,
+    })
+    .eq('id', paymentId)
+    .select(
+      'id, status, reported_at, reported_amount, reported_memo'
+    )
+    .single();
+  if (error) throw error;
+  return data as {
+    id: string;
+    status: DuesStatus;
+    reported_at: string | null;
+    reported_amount: number | null;
+    reported_memo: string | null;
+  };
+}
+
+// 회원: 신고 취소 (pending_payment → unpaid). US-C04 P1.
+export async function cancelMyDuesReport(
+  supabase: TypedSupabaseClient,
+  paymentId: string
+) {
+  const { error } = await (supabase.from('dues_payment') as any)
+    .update({
+      status: 'unpaid',
+      reported_at: null,
+      reported_amount: null,
+      reported_memo: null,
+    })
+    .eq('id', paymentId);
+  if (error) throw error;
+}
+
+// 임원: 컨펌/반려는 Route Handler 경유.
+export async function approveDuesPayment(paymentId: string) {
+  const res = await fetch(`/api/dues/admin/payments/${paymentId}/approve`, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? '컨펌에 실패했어요');
+  }
+  return (await res.json()) as { id: string; status: DuesStatus };
+}
+
+export async function rejectDuesPayment(paymentId: string, reason: string) {
+  const res = await fetch(`/api/dues/admin/payments/${paymentId}/reject`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? '반려에 실패했어요');
+  }
+  return (await res.json()) as { id: string; status: DuesStatus };
+}
+
+// 임원: 입금 신고 목록.
+export interface PendingPaymentRow {
+  id: string;
+  member_id: string;
+  member_name: string;
+  cohort_year: number | null;
+  term_id: string;
+  term_label: string;
+  term_amount_krw: number;
+  reported_at: string;
+  reported_amount: number;
+  reported_memo: string | null;
+}
+
+export async function listPendingDuesPayments(
+  supabase: TypedSupabaseClient
+): Promise<PendingPaymentRow[]> {
+  const { data, error } = await supabase
+    .from('dues_payment')
+    .select(
+      'id, member_id, reported_at, reported_amount, reported_memo, ' +
+        'member:profiles!member_id(name, cohort_year), ' +
+        'dues_term:dues_term_id(id, label, amount_krw)'
+    )
+    .eq('status', 'pending_payment')
+    .order('reported_at', { ascending: true });
+  if (error) throw error;
+  type RowShape = {
+    id: string;
+    member_id: string;
+    reported_at: string | null;
+    reported_amount: number | null;
+    reported_memo: string | null;
+    member: { name: string; cohort_year: number | null } | null;
+    dues_term: { id: string; label: string; amount_krw: number } | null;
+  };
+  return ((data ?? []) as unknown as RowShape[])
+    .filter((r) => r.reported_at != null && r.dues_term && r.member)
+    .map((r) => ({
+      id: r.id,
+      member_id: r.member_id,
+      member_name: r.member!.name,
+      cohort_year: r.member!.cohort_year,
+      term_id: r.dues_term!.id,
+      term_label: r.dues_term!.label,
+      term_amount_krw: r.dues_term!.amount_krw,
+      reported_at: r.reported_at!,
+      reported_amount: r.reported_amount ?? 0,
+      reported_memo: r.reported_memo,
+    }));
+}
+
+// CSV 일괄 확정용 입력 (06_backend §4.6)
+export interface DuesCsvCommitRow {
+  matchType: DuesMatchType;
+  paymentId: string;
+  sourceBank: DuesSourceBank;
+  raw: {
+    payerName: string;
+    memo: string | null;
+    amount: number;
+    transactionDate: string; // 'YYYY-MM-DD' 또는 ISO
+  };
+}
+
+export async function commitDuesCsvBatch(rows: DuesCsvCommitRow[]) {
+  const res = await fetch('/api/dues/admin/transactions/commit', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ rows }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? '일괄 확정에 실패했어요');
+  }
+  return (await res.json()) as {
+    ok: number;
+    failed: number;
+    failures: Array<{ paymentId: string; reason: string }>;
+  };
+}
+
+// match_source 사용처가 다른 곳에서 import 할 수 있도록 re-export 자리.
+export type { DuesMatchSource };

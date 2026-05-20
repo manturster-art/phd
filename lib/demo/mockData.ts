@@ -373,14 +373,15 @@ export const demoDuesTerms: DuesTermItem[] = [
 ];
 
 // 회원 본인 (김지민) 학기별 납부 내역
+// v0.3: 신규 상태 샘플 (pending_payment, rejected) 추가 — Frontend 데모용.
 export const demoMyDues: MyDuesRow[] = [
   {
     id: 'pay-jimin-2026-1',
-    status: 'paid',
-    paid_at: ago(40 * DAY),
-    memo: '4월 10일 입금 확인',
-    memo_public: true,
-    updated_at: ago(40 * DAY),
+    status: 'pending_payment', // v0.3: 신고 후 컨펌 대기
+    paid_at: null,
+    memo: null,
+    memo_public: false,
+    updated_at: ago(1 * HOUR),
     dues_term: {
       id: 't-2026-1',
       label: '2026-1학기',
@@ -418,6 +419,130 @@ export const demoMyDues: MyDuesRow[] = [
       due_date: '2025-04-30',
       description_md: null,
     },
+  },
+];
+
+// v0.3 신규: 회비 상세(SCR-051) + 입금 신고 시트 데모용 메타.
+// `pay-jimin-*` 와 1:1 매핑. 화면이 status 별 분기 확인용으로 사용.
+export interface DemoDuesDetail {
+  id: string;
+  termId: string;
+  termLabel: string;
+  termAmountKrw: number;
+  termDueDate: string | null;
+  status:
+    | 'unpaid'
+    | 'paid'
+    | 'exempt'
+    | 'partial'
+    | 'pending_payment'
+    | 'rejected';
+  reportedAt: string | null;
+  reportedAmountKrw: number | null;
+  reportedMemo: string | null;
+  rejectionReason: string | null;
+  memberName: string;
+}
+
+export const demoDuesDetails: Record<string, DemoDuesDetail> = {
+  'pay-jimin-2026-1': {
+    id: 'pay-jimin-2026-1',
+    termId: 't-2026-1',
+    termLabel: '2026-1학기',
+    termAmountKrw: 50000,
+    termDueDate: '2026-04-30',
+    status: 'pending_payment',
+    reportedAt: ago(1 * HOUR),
+    reportedAmountKrw: 50000,
+    reportedMemo: '4/10 입금했어요',
+    rejectionReason: null,
+    memberName: '김지민',
+  },
+  'pay-jimin-2025-2': {
+    id: 'pay-jimin-2025-2',
+    termId: 't-2025-2',
+    termLabel: '2025-2학기',
+    termAmountKrw: 50000,
+    termDueDate: '2025-10-31',
+    status: 'exempt',
+    reportedAt: null,
+    reportedAmountKrw: null,
+    reportedMemo: null,
+    rejectionReason: null,
+    memberName: '김지민',
+  },
+  'pay-jimin-2025-1': {
+    id: 'pay-jimin-2025-1',
+    termId: 't-2025-1',
+    termLabel: '2025-1학기',
+    termAmountKrw: 50000,
+    termDueDate: '2025-04-30',
+    status: 'unpaid',
+    reportedAt: null,
+    reportedAmountKrw: null,
+    reportedMemo: null,
+    rejectionReason: null,
+    memberName: '김지민',
+  },
+  // 반려된 케이스 데모 — 회원 화면 변형 확인용 (필요 시 navigate).
+  'pay-jimin-rejected': {
+    id: 'pay-jimin-rejected',
+    termId: 't-2024-2',
+    termLabel: '2024-2학기',
+    termAmountKrw: 50000,
+    termDueDate: '2024-10-31',
+    status: 'rejected',
+    reportedAt: ago(2 * DAY),
+    reportedAmountKrw: 50000,
+    reportedMemo: '입금했습니다',
+    rejectionReason:
+      '입금자명을 김지민/24-2 로 적어주세요. 김지민XX 로 입금되어 매칭할 수 없습니다.',
+    memberName: '김지민',
+  },
+};
+
+// v0.3: 임원 컨펌 목록 데모 데이터 (SCR-064).
+export interface DemoPendingPayment {
+  id: string;
+  memberName: string;
+  cohortYear: number;
+  termLabel: string;
+  termAmountKrw: number;
+  reportedAmountKrw: number;
+  reportedAt: string;
+  reportedMemo: string | null;
+}
+
+export const demoPendingPayments: DemoPendingPayment[] = [
+  {
+    id: 'pay-jimin-2026-1',
+    memberName: '김지민',
+    cohortYear: 2026,
+    termLabel: '2026-1학기',
+    termAmountKrw: 50000,
+    reportedAmountKrw: 50000,
+    reportedAt: ago(1 * HOUR),
+    reportedMemo: '4월 10일 입금 (4월급여로)',
+  },
+  {
+    id: 'pay-sua-pending',
+    memberName: '이수아',
+    cohortYear: 2024,
+    termLabel: '2026-1학기',
+    termAmountKrw: 50000,
+    reportedAmountKrw: 30000,
+    reportedAt: ago(30 * MIN),
+    reportedMemo: null,
+  },
+  {
+    id: 'pay-minjun-pending',
+    memberName: '정민준',
+    cohortYear: 2025,
+    termLabel: '2025-2학기',
+    termAmountKrw: 50000,
+    reportedAmountKrw: 50000,
+    reportedAt: ago(10 * MIN),
+    reportedMemo: '학회 다녀와서 늦었습니다 죄송합니다',
   },
 ];
 

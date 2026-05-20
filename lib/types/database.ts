@@ -13,7 +13,34 @@ export type UserRole = 'member' | 'officer' | 'admin';
 export type ProfileStatus = 'pending' | 'active' | 'rejected' | 'suspended' | 'withdrawn';
 export type PostCategory = 'general' | 'question' | 'share' | 'recruit';
 export type RsvpStatus = 'going' | 'not_going' | 'maybe';
-export type DuesStatus = 'unpaid' | 'paid' | 'exempt' | 'partial';
+// v0.3 (06_backend): 입금 신고/반려 흐름 추가.
+//   - pending_payment: 회원이 입금 신고 후 임원 컨펌 대기
+//   - rejected: 임원이 반려 (사유 별도 컬럼)
+export type DuesStatus =
+  | 'unpaid'
+  | 'paid'
+  | 'exempt'
+  | 'partial'
+  | 'pending_payment'
+  | 'rejected';
+
+// CSV 매칭 거래 분류 — Designer §3 매칭 매트릭스.
+export type DuesMatchKind = 'auto' | 'multi' | 'none';
+// match_log.source_bank / match_type — Backend §1 ERD.
+export type DuesSourceBank =
+  | 'kb'
+  | 'shinhan'
+  | 'woori'
+  | 'kakaobank'
+  | 'toss'
+  | 'unknown';
+export type DuesMatchType =
+  | 'auto_exact'
+  | 'auto_pattern'
+  | 'auto_oldest'
+  | 'manual';
+// dues_payment.match_source — paid 전이 출처.
+export type DuesMatchSource = 'manual' | 'member_report' | 'csv_upload';
 export type NotificationKind =
   | 'notice_published'
   | 'comment_on_my_post'
@@ -317,6 +344,13 @@ export interface Database {
           updated_by: string | null;
           created_at: string;
           updated_at: string;
+          // v0.3 (마이그레이션 20260520000015)
+          reported_at: string | null;
+          reported_amount: number | null;
+          reported_memo: string | null;
+          rejection_reason: string | null;
+          bank_account_id: string | null;
+          match_source: DuesMatchSource | null;
         };
         Insert: {
           id?: string;
@@ -330,6 +364,12 @@ export interface Database {
           updated_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          reported_at?: string | null;
+          reported_amount?: number | null;
+          reported_memo?: string | null;
+          rejection_reason?: string | null;
+          bank_account_id?: string | null;
+          match_source?: DuesMatchSource | null;
         };
         Update: {
           id?: string;
@@ -342,6 +382,51 @@ export interface Database {
           paid_at?: string | null;
           updated_by?: string | null;
           updated_at?: string;
+          reported_at?: string | null;
+          reported_amount?: number | null;
+          reported_memo?: string | null;
+          rejection_reason?: string | null;
+          bank_account_id?: string | null;
+          match_source?: DuesMatchSource | null;
+        };
+        Relationships: [];
+      };
+      dues_match_log: {
+        Row: {
+          id: string;
+          payment_id: string;
+          raw_payer_name: string;
+          raw_memo: string | null;
+          raw_amount: number | null;
+          raw_transaction_date: string | null;
+          source_bank: DuesSourceBank;
+          match_type: DuesMatchType;
+          matched_at: string;
+          matched_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          payment_id: string;
+          raw_payer_name: string;
+          raw_memo?: string | null;
+          raw_amount?: number | null;
+          raw_transaction_date?: string | null;
+          source_bank: DuesSourceBank;
+          match_type: DuesMatchType;
+          matched_at?: string;
+          matched_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          payment_id?: string;
+          raw_payer_name?: string;
+          raw_memo?: string | null;
+          raw_amount?: number | null;
+          raw_transaction_date?: string | null;
+          source_bank?: DuesSourceBank;
+          match_type?: DuesMatchType;
+          matched_at?: string;
+          matched_by?: string | null;
         };
         Relationships: [];
       };
