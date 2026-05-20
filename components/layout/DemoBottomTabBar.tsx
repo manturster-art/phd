@@ -1,5 +1,4 @@
-// 데모 전용 하단 탭바. 실제 BottomTabBar 와 같은 5탭 구조이지만 모든 링크가
-// /demo/* 하위로 매핑된다. /demo/* 경로에서만 사용된다.
+// 데모 전용 하단 탭바. Apple 그래머는 BottomTabBar 와 동일.
 'use client';
 
 import Link from 'next/link';
@@ -58,15 +57,22 @@ export function DemoBottomTabBar() {
               href={tab.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs',
-                'min-h-[56px]',
-                active ? 'text-primary-600 font-semibold' : 'text-text-secondary'
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2',
+                'min-h-[56px] active:scale-95 transition-transform',
+                active ? 'text-primary-500' : 'text-text-primary'
               )}
             >
               <span aria-hidden className="text-lg leading-none">
                 {tab.icon}
               </span>
-              <span>{tab.label}</span>
+              <span
+                className={cn(
+                  'text-xs',
+                  active ? 'font-semibold' : 'font-normal text-text-secondary'
+                )}
+              >
+                {tab.label}
+              </span>
             </Link>
           );
         })}

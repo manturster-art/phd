@@ -1,6 +1,7 @@
 import type { Config } from 'tailwindcss';
 
-// 디자인 토큰 매핑 (02_designer_uiux.md §5)
+// Apple.com design-system 기반 토큰 — 토큰 이름은 보존, 값만 교체.
+// 출처: _workspace/external/apple-design-system.md
 const config: Config = {
   content: [
     './app/**/*.{ts,tsx}',
@@ -10,65 +11,80 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Action Blue — 단일 액션 컬러. 모든 인터랙티브 = primary-500.
+        // 50/100 은 본문 표면에서 사용되지만 채도가 매우 낮아 거의 무채색 톤으로.
         primary: {
-          50: '#EEF2FF',
-          100: '#E0E7FF',
-          500: '#4F46E5',
-          600: '#4338CA',
-          700: '#3730A3',
+          50: '#f5f5f7',   // parchment alias (배경 강조용)
+          100: '#e8eef7',  // 매우 옅은 액션 블루 계열 (배지/얇은 강조)
+          500: '#0066cc',  // Action Blue
+          600: '#0066cc',  // 동일 — hover 시 transform: scale 로 표현
+          700: '#0055aa',  // active 시 약간 더 짙은 톤 (필요한 곳만)
         },
-        surface: '#FFFFFF',
+        surface: '#FFFFFF',          // canvas
         bg: {
-          DEFAULT: '#F8FAFC',
-          subtle: '#F1F5F9',
+          DEFAULT: '#f5f5f7',        // parchment — 페이지 배경
+          subtle: '#fafafc',         // pearl — 더 옅은 보조 배경
         },
         text: {
-          primary: '#0F172A',
-          secondary: '#475569',
-          muted: '#94A3B8',
+          primary: '#1d1d1f',        // ink (headline + body)
+          secondary: '#6e6e73',      // muted body
+          muted: '#7a7a7a',          // ink-muted-48 (legal/disabled)
           inverse: '#FFFFFF',
         },
         border: {
-          DEFAULT: '#E2E8F0',
-          strong: '#CBD5E1',
+          DEFAULT: '#e0e0e0',        // hairline
+          strong: '#d2d2d7',
         },
+        // Semantic — 의미 보존하되 채도 낮춘 톤. 회비 상태 표시용.
         success: {
-          DEFAULT: '#16A34A',
-          bg: '#DCFCE7',
+          DEFAULT: '#1d7a3d',        // muted green
+          bg: '#eaf4ee',
         },
         warning: {
-          DEFAULT: '#D97706',
-          bg: '#FEF3C7',
+          DEFAULT: '#8a5a00',        // muted amber
+          bg: '#f7efe1',
         },
         danger: {
-          DEFAULT: '#DC2626',
-          bg: '#FEE2E2',
+          DEFAULT: '#a8261c',        // muted red
+          bg: '#f5e7e5',
         },
         info: {
-          DEFAULT: '#0EA5E9',
+          DEFAULT: '#0066cc',        // == Action Blue. 정보 강조는 액션 컬러로 통합.
         },
         neutral: {
-          bg: '#F1F5F9',
+          bg: '#f5f5f7',             // parchment 동일
         },
       },
       fontFamily: {
+        // SF Pro → Apple SD Gothic Neo → Noto Sans KR 순서로 한국어 환경 지원.
         sans: [
-          'Pretendard',
           '-apple-system',
           'BlinkMacSystemFont',
+          '"SF Pro Text"',
+          '"SF Pro Display"',
+          '"Apple SD Gothic Neo"',
+          '"Pretendard"',
+          '"Noto Sans KR"',
           'system-ui',
           'sans-serif',
         ],
         mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
+      // 17px 본문 기준 + Apple 행간/트래킹. 한국어는 트래킹을 -0.01em 로 완화.
       fontSize: {
-        xs: ['12px', { lineHeight: '1.5' }],
-        sm: ['14px', { lineHeight: '1.5' }],
-        base: ['16px', { lineHeight: '1.5' }],
-        lg: ['18px', { lineHeight: '1.5' }],
-        xl: ['20px', { lineHeight: '1.25' }],
-        '2xl': ['24px', { lineHeight: '1.25' }],
-        '3xl': ['30px', { lineHeight: '1.25' }],
+        xs: ['12px', { lineHeight: '1.33', letterSpacing: '-0.005em' }],     // fine-print
+        sm: ['14px', { lineHeight: '1.43', letterSpacing: '-0.01em' }],      // caption
+        base: ['17px', { lineHeight: '1.47', letterSpacing: '-0.01em' }],    // body
+        lg: ['21px', { lineHeight: '1.19', letterSpacing: '-0.015em' }],     // tagline
+        xl: ['24px', { lineHeight: '1.2', letterSpacing: '-0.015em' }],
+        '2xl': ['28px', { lineHeight: '1.14', letterSpacing: '-0.02em' }],   // lead
+        '3xl': ['34px', { lineHeight: '1.12', letterSpacing: '-0.02em' }],
+        '4xl': ['40px', { lineHeight: '1.1', letterSpacing: '-0.02em' }],    // display-lg
+      },
+      letterSpacing: {
+        tight: '-0.02em',
+        normal: '-0.01em',
+        loose: '0em',
       },
       spacing: {
         '0': '0px',
@@ -82,20 +98,27 @@ const config: Config = {
         '10': '40px',
         '12': '48px',
         '16': '64px',
+        '20': '80px',
       },
       borderRadius: {
         none: '0',
-        sm: '6px',
-        md: '10px',
-        lg: '16px',
+        xs: '5px',
+        sm: '8px',     // dark utility button
+        md: '11px',    // pearl button (소형)
+        lg: '18px',    // store utility card
         xl: '20px',
+        pill: '9999px',
         full: '9999px',
       },
       boxShadow: {
-        sm: '0 1px 2px rgba(15,23,42,0.06)',
-        md: '0 4px 12px rgba(15,23,42,0.08)',
-        lg: '0 12px 32px rgba(15,23,42,0.12)',
-        focus: '0 0 0 3px rgba(79,70,229,0.35)',
+        // 카드/버튼/텍스트에 그림자 금지 — sm/md/lg 는 사실상 none.
+        sm: 'none',
+        md: 'none',
+        lg: 'none',
+        // 키보드 포커스 링 — 2px Focus Blue.
+        focus: '0 0 0 2px #0071e3',
+        // FAB / 제품 그림자 — Apple 시스템의 유일한 drop-shadow.
+        product: '0 5px 30px 3px rgba(0,0,0,0.22)',
       },
       transitionDuration: {
         fast: '120ms',
@@ -122,6 +145,9 @@ const config: Config = {
         sm: '360px',
         md: '640px',
         lg: '1024px',
+      },
+      scale: {
+        '95': '0.95',   // Apple active state — transform: scale(0.95)
       },
     },
   },

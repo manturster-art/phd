@@ -1,11 +1,22 @@
-// C-180 Toast (전역 컨텍스트 + Provider)
+// C-180 Toast — Apple 그래머: near-black 알약 메시지.
+// 그림자 금지(시스템 원칙) — 토스트는 액션 컬러로 의미 구분.
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ReactNode,
+} from 'react';
 import { cn } from '@/lib/utils/cn';
 
 type Kind = 'info' | 'success' | 'error';
-interface ToastItem { id: number; message: string; kind: Kind; }
+interface ToastItem {
+  id: number;
+  message: string;
+  kind: Kind;
+}
 
 interface ToastApi {
   show: (message: string, kind?: Kind) => void;
@@ -35,7 +46,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={t.id}
             className={cn(
-              'pointer-events-auto rounded-md px-4 py-2 text-sm text-white shadow-md',
+              'pointer-events-auto rounded-pill px-4 py-2 text-sm text-white',
               t.kind === 'success' && 'bg-success',
               t.kind === 'error' && 'bg-danger',
               t.kind === 'info' && 'bg-text-primary'

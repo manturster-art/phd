@@ -53,11 +53,11 @@ export default async function LoginPage({
   return (
     <div className="mx-auto max-w-sm">
       <div className="mb-8 text-center">
-        <h1 className="text-3xl font-bold text-primary-600">원우회</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-text-primary">원우회</h1>
         <p className="mt-2 text-sm text-text-secondary">대학원 원우회 커뮤니티</p>
       </div>
       {label && (
-        <div className="mb-4 rounded-md bg-danger-bg p-3 text-sm text-danger" role="alert">
+        <div className="mb-4 rounded-lg bg-danger-bg p-4 text-sm text-danger" role="alert">
           <p className="font-medium">{label}</p>
           {reason === 'rejected' && rejectionReason && (
             <p className="mt-1 text-xs text-danger/90">

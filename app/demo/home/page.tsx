@@ -32,7 +32,7 @@ export default function DemoHomePage() {
         trailing={
           <span
             aria-label="내 프로필"
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-primary-700 text-sm font-semibold"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-bg text-text-primary text-sm font-semibold"
           >
             {currentDemoMember.name.slice(0, 1)}
           </span>

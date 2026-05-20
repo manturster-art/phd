@@ -11,9 +11,9 @@ interface Props {
 
 export function DuesMatrixTable({ rows, onCellTap }: Props) {
   return (
-    <div className="overflow-x-auto rounded-md border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border">
       <table className="w-full border-collapse text-sm">
-        <thead className="bg-bg-subtle text-left">
+        <thead className="bg-bg text-left">
           <tr>
             <th className="px-3 py-2 font-medium">이름</th>
             <th className="px-3 py-2 font-medium">학번</th>
@@ -28,7 +28,7 @@ export function DuesMatrixTable({ rows, onCellTap }: Props) {
             return (
               <tr
                 key={row.id}
-                className="cursor-pointer border-t border-border hover:bg-bg-subtle"
+                className="cursor-pointer border-t border-border hover:bg-bg"
                 onClick={() => onCellTap(row)}
               >
                 <td className="px-3 py-2 font-medium">{m?.name ?? '(탈퇴회원)'}</td>

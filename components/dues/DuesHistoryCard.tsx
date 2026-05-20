@@ -10,7 +10,7 @@ interface Props {
 export function DuesHistoryCard({ row }: Props) {
   const term = row.dues_term;
   return (
-    <div className="border-b border-border px-4 py-3 last:border-b-0">
+    <div className="border-b border-border px-4 py-4 last:border-b-0">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-text-primary">{term?.label ?? '항목 없음'}</p>
         <DuesStatusBadge status={row.status} />

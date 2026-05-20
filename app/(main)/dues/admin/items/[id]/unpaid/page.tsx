@@ -53,7 +53,7 @@ export default async function UnpaidPage({ params }: { params: { id: string } })
     <>
       <AppBar title={`미납자 · ${term.label}`} leading="back" />
       <div className="space-y-4 py-4">
-        <div className="rounded-md bg-bg-subtle px-3 py-2 text-sm text-text-secondary">
+        <div className="rounded-lg bg-bg px-4 py-2.5 text-sm text-text-secondary">
           {list.length}명 미납 · {formatKRW(list.length * term.amount_krw)}
           {inactive.length > 0 && (
             <span className="ml-1 text-xs">

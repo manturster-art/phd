@@ -5,16 +5,26 @@
 @layer base {
   html {
     -webkit-text-size-adjust: 100%;
-    font-size: 16px;
+    /* Apple 본문 17px. iOS 입력 zoom 방지에도 충분. */
+    font-size: 17px;
   }
 
   body {
     @apply bg-bg text-text-primary font-sans;
     min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: 'ss01', 'ss02';
+    /* 한국어 가독성: 본문 트래킹을 -0.01em 으로 완화 (Apple 원본은 -0.374px). */
+    letter-spacing: -0.01em;
   }
 
+  /* SF Pro 의 weight 600 보다 한국어(Apple SD Gothic Neo / Noto Sans KR)의 600 이
+     약간 가볍게 보일 수 있으므로 강조 weight 600 으로 통일. weight 500 은 사용 금지. */
+
   *:focus-visible {
-    @apply outline-none shadow-focus rounded-sm;
+    @apply outline-none shadow-focus;
+    border-radius: 4px;
   }
 
   /* iOS safe-area 변수 노출 */

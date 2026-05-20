@@ -13,7 +13,7 @@ export function DemoEventListItem({ event }: { event: Event }) {
           `[데모] ${event.title}\n${formatDateTime(event.starts_at)}\n${event.location ?? ''}`
         )
       }
-      className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg-subtle"
+      className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg transition-colors"
     >
       <p className="text-sm font-semibold text-text-primary">{event.title}</p>
       <p className="mt-1 text-xs text-text-secondary">

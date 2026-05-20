@@ -63,7 +63,7 @@ export function DuesAdminClient({ terms, activeTermId, matrix, officerId }: Prop
         <select
           value={activeTermId}
           onChange={(e) => onTermChange(e.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-base"
+          className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-4 text-base"
         >
           {terms.map((t) => (
             <option key={t.id} value={t.id}>{t.label}</option>
@@ -91,7 +91,7 @@ export function DuesAdminClient({ terms, activeTermId, matrix, officerId }: Prop
         onChange={setFilter}
       />
 
-      <div className="rounded-md bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
+      <div className="rounded-lg bg-bg px-4 py-2.5 text-xs text-text-secondary">
         총원 {stats.total} · 납부 {stats.paid} · 미납 {stats.unpaid} · 면제 {stats.exempt}
       </div>
 

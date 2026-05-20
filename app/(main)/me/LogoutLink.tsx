@@ -19,7 +19,7 @@ export function LogoutLink() {
           router.refresh();
         })
       }
-      className="block w-full px-4 py-3 text-left text-sm text-danger hover:bg-bg-subtle disabled:opacity-50"
+      className="block w-full px-4 py-3 text-left text-sm text-danger hover:bg-bg disabled:opacity-50"
     >
       로그아웃 →
     </button>

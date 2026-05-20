@@ -1,5 +1,6 @@
-// 데모 페이지에서 데스크톱 화면일 때 좌측에 노출되는 사이드바.
-// 모바일에선 숨겨지고, lg 이상에서만 노출.
+// 데모 사이드바 — Apple 그래머:
+// parchment 배경 + ink 텍스트 + 18px 라운드 + hairline 보더, 그림자 없음.
+// active 또는 hover 만 Action Blue 또는 흰 표면 강조.
 import Link from 'next/link';
 import { demoScreens } from '@/lib/demo/mockData';
 
@@ -7,16 +8,16 @@ export function DemoSidebar() {
   return (
     <aside
       aria-label="다른 데모 화면"
-      className="hidden lg:block fixed left-4 top-24 w-60 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-md border border-border bg-surface p-3 text-sm shadow-sm"
+      className="hidden lg:block fixed left-4 top-24 w-60 max-h-[calc(100dvh-7rem)] overflow-y-auto rounded-lg border border-border bg-bg p-4 text-sm"
     >
-      <p className="mb-2 text-xs font-semibold text-text-secondary">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-secondary">
         다른 데모 화면
       </p>
-      <ul className="space-y-1">
+      <ul className="space-y-0.5">
         <li>
           <Link
             href="/demo"
-            className="block rounded-md px-2 py-1.5 text-text-primary hover:bg-bg-subtle"
+            className="block rounded-sm px-2 py-1.5 text-text-primary hover:bg-surface"
           >
             ← 데모 홈
           </Link>
@@ -25,7 +26,7 @@ export function DemoSidebar() {
           <li key={s.scrId}>
             <Link
               href={s.href}
-              className="block rounded-md px-2 py-1.5 hover:bg-bg-subtle"
+              className="block rounded-sm px-2 py-1.5 hover:bg-surface"
             >
               <span className="text-xs text-text-muted">{s.scrId}</span>{' '}
               <span className="text-text-primary">{s.name}</span>

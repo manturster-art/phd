@@ -1,4 +1,5 @@
 // /demo/* 모든 페이지의 공통 레이아웃. 데모 모드 배너 + 사이드바 + 하단 탭바.
+// Apple 그래머: 배너는 parchment 배경 + ink 텍스트 + 좌측 Action Blue 1px 라인.
 import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { DemoBottomTabBar } from '@/components/layout/DemoBottomTabBar';
@@ -11,13 +12,16 @@ export const metadata = {
 export default function DemoLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-[100dvh] bg-bg">
-      {/* 프로토타입 안내 배너 */}
+      {/* 프로토타입 안내 배너 — Apple InfoBanner 그래머에 맞춰 정제. */}
       <div
         role="status"
-        className="sticky top-0 z-sticky border-b border-warning/40 bg-warning-bg px-4 py-2 text-center text-xs font-medium text-warning"
+        className="sticky top-0 z-sticky border-b border-border border-l-[3px] border-l-primary-500 bg-surface px-4 py-2 text-center text-xs font-normal text-text-primary"
       >
         프로토타입 데모 모드 — Supabase 미연결, 실제 데이터 없음 ·{' '}
-        <Link href="/demo" className="underline hover:no-underline">
+        <Link
+          href="/demo"
+          className="text-primary-500 hover:underline"
+        >
           데모 홈
         </Link>
       </div>

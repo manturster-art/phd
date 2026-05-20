@@ -1,4 +1,5 @@
-// C-140 SegmentedControl
+// C-140 SegmentedControl — Apple 그래머:
+// parchment 트랙 + 활성 칩은 흰색 표면, 활성 텍스트만 Action Blue.
 'use client';
 
 import { cn } from '@/lib/utils/cn';
@@ -25,7 +26,7 @@ export function SegmentedControl<T extends string>({
     <div
       role="tablist"
       className={cn(
-        'inline-flex w-full rounded-md border border-border bg-bg-subtle p-1',
+        'inline-flex w-full rounded-pill border border-border bg-bg p-1',
         className
       )}
     >
@@ -39,9 +40,10 @@ export function SegmentedControl<T extends string>({
             aria-selected={active}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'min-h-[44px] flex-1 rounded-md px-3 text-sm font-medium transition-colors',
+              'min-h-[40px] flex-1 rounded-pill px-3 text-sm transition-colors',
+              'active:scale-95',
               active
-                ? 'bg-surface text-text-primary shadow-sm'
+                ? 'bg-surface text-primary-500 font-semibold'
                 : 'text-text-secondary'
             )}
           >

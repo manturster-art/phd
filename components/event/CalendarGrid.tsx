@@ -52,22 +52,24 @@ export function CalendarGrid({
   }, [events]);
 
   return (
-    <div className="rounded-md border border-border bg-surface p-3">
-      <div className="mb-2 flex items-center justify-between">
+    <div className="rounded-lg border border-border bg-surface p-4">
+      <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
           aria-label="이전 달"
           onClick={onPrevMonth}
-          className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-bg-subtle"
+          className="flex h-9 w-9 items-center justify-center rounded-pill text-text-primary hover:bg-bg active:scale-95"
         >
           ‹
         </button>
-        <p className="text-sm font-semibold">{year}년 {month}월</p>
+        <p className="text-base font-semibold text-text-primary">
+          {year}년 {month}월
+        </p>
         <button
           type="button"
           aria-label="다음 달"
           onClick={onNextMonth}
-          className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-bg-subtle"
+          className="flex h-9 w-9 items-center justify-center rounded-pill text-text-primary hover:bg-bg active:scale-95"
         >
           ›
         </button>
@@ -77,9 +79,8 @@ export function CalendarGrid({
           <div
             key={w}
             className={cn(
-              'text-center text-xs font-medium py-1',
-              i === 0 && 'text-danger',
-              i === 6 && 'text-info'
+              'text-center text-xs font-normal py-1',
+              i === 0 ? 'text-danger' : 'text-text-secondary'
             )}
           >
             {w}
@@ -98,10 +99,10 @@ export function CalendarGrid({
               type="button"
               onClick={() => onSelect(dateStr)}
               className={cn(
-                'flex h-10 flex-col items-center justify-center rounded-md text-sm',
+                'flex h-10 flex-col items-center justify-center rounded-pill text-sm transition-transform active:scale-95',
                 selected
-                  ? 'bg-primary-500 text-white'
-                  : 'hover:bg-bg-subtle text-text-primary'
+                  ? 'bg-primary-500 text-white font-semibold'
+                  : 'hover:bg-bg text-text-primary'
               )}
             >
               <span>{d.getDate()}</span>

@@ -20,7 +20,7 @@ export function UnpaidMemberItem({ member, badge }: Props) {
           <span className="ml-2 text-xs text-text-secondary">· {member.cohort_year}학번</span>
         )}
         {badge && (
-          <span className="ml-2 inline-flex items-center rounded-full bg-bg-subtle px-2 py-0.5 text-[10px] font-medium text-text-secondary">
+          <span className="ml-2 inline-flex items-center rounded-pill bg-bg px-2 py-0.5 text-[10px] font-normal text-text-secondary">
             {badge}
           </span>
         )}
@@ -30,7 +30,7 @@ export function UnpaidMemberItem({ member, badge }: Props) {
       )}
       {member.phone && (
         <div className="mt-1 flex items-center gap-3">
-          <a href={`tel:${member.phone}`} className="text-xs text-primary-600 hover:underline">
+          <a href={`tel:${member.phone}`} className="text-xs text-primary-500 hover:underline">
             📞 {member.phone}
           </a>
           <button

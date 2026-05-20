@@ -32,7 +32,7 @@ export default async function DuesAdminPage({
         trailing={
           <Link
             href="/dues/admin/items"
-            className="rounded-md bg-primary-100 px-3 py-1.5 text-xs font-medium text-primary-700"
+            className="rounded-pill border border-primary-500 px-4 py-1.5 text-xs font-normal text-primary-500 active:scale-95 transition-transform"
           >
             항목 관리
           </Link>

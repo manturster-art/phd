@@ -1,4 +1,5 @@
-// C-170 BottomSheet
+// C-170 BottomSheet — Apple 그래머: 상단 라운드 18px, 표면 흰색, 그림자 없음.
+// 백드롭은 black/40 유지 (Apple 의 modal 백드롭과 유사).
 'use client';
 
 import { useEffect, type ReactNode } from 'react';
@@ -37,14 +38,17 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
     >
       <div
         className={cn(
-          'w-full max-w-app rounded-t-lg bg-surface p-4 shadow-lg',
+          'w-full max-w-app bg-surface p-6',
+          'rounded-t-lg border-t border-x border-border',
           'animate-[slideUp_200ms_ease-out]'
         )}
-        style={{ paddingBottom: `calc(1rem + var(--sab, 0px))` }}
+        style={{ paddingBottom: `calc(24px + var(--sab, 0px))` }}
         onClick={(e) => e.stopPropagation()}
       >
         {title && (
-          <div className="mb-3 text-base font-semibold text-text-primary">{title}</div>
+          <div className="mb-4 text-lg font-semibold text-text-primary">
+            {title}
+          </div>
         )}
         {children}
       </div>

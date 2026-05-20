@@ -76,9 +76,9 @@ export function DuesEditSheet({ open, row, termLabel, officerId, onClose }: Prop
                 type="button"
                 onClick={() => setStatus(opt.value)}
                 className={cn(
-                  'min-h-[44px] flex-1 rounded-md border px-3 text-sm font-medium',
+                  'min-h-[44px] flex-1 rounded-pill border px-3 text-sm transition-transform active:scale-95',
                   status === opt.value
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
+                    ? 'border-primary-500 bg-primary-500 text-white font-semibold'
                     : 'border-border bg-surface text-text-secondary'
                 )}
               >
@@ -98,7 +98,7 @@ export function DuesEditSheet({ open, row, termLabel, officerId, onClose }: Prop
         <label className="flex min-h-[44px] items-center gap-2 text-sm">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded border-border text-primary-600 focus:ring-primary-500"
+            className="h-4 w-4 rounded border-border text-primary-500 focus:ring-primary-500"
             checked={memoPublic}
             onChange={(e) => setMemoPublic(e.target.checked)}
             disabled={!memo.trim()}

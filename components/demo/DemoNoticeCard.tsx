@@ -8,7 +8,7 @@ export function DemoNoticeCard({ notice }: { notice: NoticeListItem }) {
   return (
     <Link
       href="/demo/notices/sample"
-      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-subtle"
+      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg transition-colors"
     >
       <div className="flex items-center gap-2">
         {notice.pinned && <Badge tone="warning">📌 핀</Badge>}

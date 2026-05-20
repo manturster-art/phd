@@ -29,7 +29,7 @@ export default async function DuesItemDetailPage({ params }: { params: { id: str
       <div className="app-container pb-12">
         <Link
           href={`/dues/admin/items/${term.id}/unpaid`}
-          className="block rounded-md bg-bg-subtle p-3 text-center text-sm font-medium text-text-primary"
+          className="block rounded-lg bg-bg p-4 text-center text-sm font-normal text-text-primary border border-border active:scale-95 transition-transform"
         >
           미납자 목록 보기 →
         </Link>

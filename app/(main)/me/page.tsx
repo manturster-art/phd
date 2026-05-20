@@ -20,12 +20,12 @@ export default async function MePage() {
       <AppBar
         title="내 프로필"
         leading="back"
-        trailing={<Link href="/me/edit" className="text-sm text-primary-600">수정</Link>}
+        trailing={<Link href="/me/edit" className="text-sm text-primary-500">수정</Link>}
       />
       <div className="space-y-4 py-4">
         <Card>
           <CardBody className="flex flex-col items-center text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-2xl font-semibold text-primary-700">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-bg text-2xl font-semibold text-text-primary">
               {profile.name.slice(0, 1)}
             </div>
             <p className="mt-3 text-lg font-semibold">{profile.name}</p>
@@ -51,11 +51,11 @@ export default async function MePage() {
 
         <Card>
           <nav className="divide-y divide-border">
-            <Link href="/me/password" className="block px-4 py-3 text-sm hover:bg-bg-subtle">
+            <Link href="/me/password" className="block px-4 py-3 text-sm hover:bg-bg">
               비밀번호 변경 →
             </Link>
             {isOfficer(profile) && (
-              <Link href="/admin/approvals" className="block px-4 py-3 text-sm hover:bg-bg-subtle">
+              <Link href="/admin/approvals" className="block px-4 py-3 text-sm hover:bg-bg">
                 가입 승인 큐 →
               </Link>
             )}

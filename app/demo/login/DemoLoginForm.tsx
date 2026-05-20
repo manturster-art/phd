@@ -51,7 +51,7 @@ export function DemoLoginForm() {
       <div className="flex justify-center gap-3 text-sm">
         <span className="text-text-secondary">비밀번호 재설정</span>
         <span className="text-text-muted">·</span>
-        <Link href="/demo/signup" className="text-primary-600 hover:underline">
+        <Link href="/demo/signup" className="text-primary-500 hover:underline">
           가입 신청
         </Link>
       </div>

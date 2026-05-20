@@ -11,7 +11,7 @@ export default function DemoSignupPage() {
         <Link
           href="/demo/login"
           aria-label="뒤로"
-          className="h-11 w-11 -ml-2 flex items-center justify-center rounded-md hover:bg-bg-subtle"
+          className="h-11 w-11 -ml-2 flex items-center justify-center rounded-pill hover:bg-bg active:scale-95"
         >
           ←
         </Link>

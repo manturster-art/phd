@@ -12,7 +12,7 @@ export function NoticeCard({ notice }: Props) {
   return (
     <Link
       href={`/notices/${notice.id}`}
-      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-subtle"
+      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg transition-colors"
     >
       <div className="flex items-center gap-2">
         {notice.pinned && <Badge tone="warning">📌 핀</Badge>}

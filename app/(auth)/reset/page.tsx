@@ -11,7 +11,7 @@ export default function ResetPage() {
         이 기능은 P1 릴리스에서 제공됩니다.<br />
         현재는 임원에게 직접 문의해주세요.
       </p>
-      <Link href="/login" className="mt-6 inline-block text-sm text-primary-600 hover:underline">
+      <Link href="/login" className="mt-6 inline-block text-sm text-primary-500 hover:underline">
         ← 로그인으로
       </Link>
     </div>

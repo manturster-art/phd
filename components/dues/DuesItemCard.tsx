@@ -12,7 +12,7 @@ export function DuesItemCard({ term, unpaidCount }: Props) {
   return (
     <Link
       href={`/dues/admin/items/${term.id}`}
-      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-subtle"
+      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg transition-colors"
     >
       <p className="text-sm font-semibold text-text-primary">{term.label}</p>
       <p className="mt-1 text-xs text-text-secondary">

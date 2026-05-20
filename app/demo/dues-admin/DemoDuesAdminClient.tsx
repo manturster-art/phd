@@ -60,7 +60,7 @@ export function DemoDuesAdminClient({ terms, matrix }: Props) {
         <select
           value={activeTermId}
           onChange={(e) => setActiveTermId(e.target.value)}
-          className="mt-1 h-11 w-full rounded-md border border-border bg-surface px-3 text-base"
+          className="mt-1 h-11 w-full rounded-lg border border-border bg-surface px-4 text-base"
         >
           {terms.map((t) => (
             <option key={t.id} value={t.id}>
@@ -90,7 +90,7 @@ export function DemoDuesAdminClient({ terms, matrix }: Props) {
         onChange={setFilter}
       />
 
-      <div className="rounded-md bg-bg-subtle px-3 py-2 text-xs text-text-secondary">
+      <div className="rounded-lg bg-bg px-4 py-2.5 text-xs text-text-secondary">
         총원 {stats.total} · 납부 {stats.paid} · 미납 {stats.unpaid} · 면제{' '}
         {stats.exempt}
       </div>
@@ -109,7 +109,7 @@ export function DemoDuesAdminClient({ terms, matrix }: Props) {
                 type="button"
                 onClick={() => handleRowTap(row)}
                 aria-label={`${m?.name ?? '회원'} 상태 ${row.status}, 변경하려면 누르세요`}
-                className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg-subtle"
+                className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg transition-colors"
               >
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-medium text-text-primary">

@@ -16,7 +16,7 @@ export function DuesMatrixRow({ row, onTap }: Props) {
       type="button"
       onClick={onTap}
       aria-label={`${m?.name ?? '회원'} 상태 ${row.status}, 변경하려면 누르세요`}
-      className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg-subtle"
+      className="block w-full border-b border-border px-4 py-3 text-left last:border-b-0 hover:bg-bg transition-colors"
     >
       <div className="flex items-center justify-between">
         <p className="text-sm font-medium text-text-primary">

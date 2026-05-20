@@ -1,4 +1,5 @@
-// C-150 BottomTabBar
+// C-150 BottomTabBar — Apple 그래머:
+// white 배경 + 상단 1px hairline. 기본 ink, active 만 Action Blue. 그림자 없음.
 'use client';
 
 import Link from 'next/link';
@@ -38,13 +39,24 @@ export function BottomTabBar() {
               href={tab.href}
               aria-current={active ? 'page' : undefined}
               className={cn(
-                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs',
-                'min-h-[56px]',
-                active ? 'text-primary-600 font-semibold' : 'text-text-secondary'
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2',
+                'min-h-[56px] active:scale-95 transition-transform',
+                active
+                  ? 'text-primary-500'
+                  : 'text-text-primary'
               )}
             >
-              <span aria-hidden className="text-lg leading-none">{tab.icon}</span>
-              <span>{tab.label}</span>
+              <span aria-hidden className="text-lg leading-none">
+                {tab.icon}
+              </span>
+              <span
+                className={cn(
+                  'text-xs',
+                  active ? 'font-semibold' : 'font-normal text-text-secondary'
+                )}
+              >
+                {tab.label}
+              </span>
             </Link>
           );
         })}

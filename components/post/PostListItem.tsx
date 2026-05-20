@@ -11,7 +11,7 @@ export function PostListItem({ post }: Props) {
   return (
     <Link
       href={`/board/${post.id}`}
-      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg-subtle"
+      className="block border-b border-border px-4 py-3 last:border-b-0 hover:bg-bg transition-colors"
     >
       <div className="flex items-start gap-2">
         <h3 className="flex-1 text-sm font-semibold text-text-primary">{post.title}</h3>

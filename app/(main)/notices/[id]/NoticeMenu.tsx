@@ -37,15 +37,15 @@ export function NoticeMenu({ noticeId }: { noticeId: string }) {
         type="button"
         aria-label="메뉴"
         onClick={() => setOpen((v) => !v)}
-        className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-bg-subtle"
+        className="flex h-9 w-9 items-center justify-center rounded-md hover:bg-bg"
       >
         ⋮
       </button>
       {open && (
-        <div className="absolute right-0 top-10 z-sticky min-w-32 rounded-md border border-border bg-surface py-1 shadow-md">
+        <div className="absolute right-0 top-10 z-sticky min-w-32 rounded-lg border border-border bg-surface py-1">
           <Link
             href={`/notices/${noticeId}/edit`}
-            className="block px-3 py-2 text-sm hover:bg-bg-subtle"
+            className="block px-3 py-2 text-sm hover:bg-bg"
             onClick={() => setOpen(false)}
           >
             수정
@@ -53,7 +53,7 @@ export function NoticeMenu({ noticeId }: { noticeId: string }) {
           <button
             type="button"
             onClick={() => { setOpen(false); setConfirm(true); }}
-            className="block w-full px-3 py-2 text-left text-sm text-danger hover:bg-bg-subtle"
+            className="block w-full px-3 py-2 text-left text-sm text-danger hover:bg-bg"
           >
             삭제
           </button>

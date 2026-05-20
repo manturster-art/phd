@@ -77,11 +77,11 @@ export function LoginForm() {
         로그인
       </Button>
       <div className="flex justify-center gap-3 text-sm">
-        <Link href="/reset" className="text-text-secondary hover:text-primary-600 hover:underline">
+        <Link href="/reset" className="text-text-secondary hover:text-primary-500 hover:underline">
           비밀번호 재설정
         </Link>
         <span className="text-text-muted">·</span>
-        <Link href="/signup" className="text-primary-600 hover:underline">
+        <Link href="/signup" className="text-primary-500 hover:underline">
           가입 신청
         </Link>
       </div>

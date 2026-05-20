@@ -18,7 +18,7 @@ export default function DemoDuesMemberPage() {
         trailing={
           <Link
             href="/demo/dues-admin"
-            className="rounded-md bg-primary-100 px-3 py-1.5 text-xs font-medium text-primary-700"
+            className="rounded-pill bg-primary-500 px-4 py-1.5 text-xs font-normal text-white active:scale-95 transition-transform"
           >
             임원 모드 미리보기 →
           </Link>

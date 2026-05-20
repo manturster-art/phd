@@ -1,4 +1,4 @@
-// C-171 ConfirmDialog
+// C-171 ConfirmDialog — Apple 그래머: 18px 라운드, hairline 보더, 그림자 없음.
 'use client';
 
 import { useEffect } from 'react';
@@ -43,10 +43,12 @@ export function ConfirmDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="w-full max-w-sm rounded-lg bg-surface p-5 shadow-lg">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6">
         <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
-        {message && <p className="mt-2 text-sm text-text-secondary">{message}</p>}
-        <div className="mt-5 flex justify-end gap-2">
+        {message && (
+          <p className="mt-2 text-sm text-text-secondary">{message}</p>
+        )}
+        <div className="mt-6 flex justify-end gap-2">
           <Button variant="secondary" onClick={onCancel}>
             {cancelLabel}
           </Button>
