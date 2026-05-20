@@ -9,6 +9,71 @@
 | 날짜 | 버전 | 변경 |
 |------|------|------|
 | 2026-05-20 | v0.1 | PM v0.2 기반 초안. P0 도메인 전체 ERD/DDL/RLS/RPC/seed 완성. |
+| 2026-05-20 | v0.2 | QA 리포트(`05_qa_report.md`) P0 이슈 4종 대응. add-only 마이그레이션 5개 추가 (B-01/B-03/B-04/B-05). 자세한 변경점은 §8 참조. |
+
+---
+
+## 8. v0.2 변경 요약 (QA P0 대응)
+
+### 8.1 신규 마이그레이션 (add-only, 기존 파일 무수정)
+
+| 파일 | 목적 | 대응 이슈 |
+|------|------|-----------|
+| `20260520000010_profile_status_rejected_enum.sql` | `profile_status` ENUM에 `'rejected'` 값 추가. Postgres가 같은 트랜잭션 안에서 새 enum 값을 사용 못 하므로 별도 파일로 분리. | B-01 (사전 작업) |
+| `20260520000011_reject_membership_uses_rejected.sql` | `reject_membership` RPC가 `'rejected'` 사용. `rejection_reason` 컬럼 추가(기존 `rejected_reason` 보존, 백필). `approve_membership`은 두 사유 컬럼을 null로 초기화. | B-01 |
+| `20260520000012_profiles_secure_update.sql` | `profiles` BEFORE UPDATE 트리거 `guard_profiles_secure_update()` — 비-officer/admin의 role/status/approved_*/rejected_*/rejection_reason/is_anonymous_placeholder/deleted_at/email 변경을 모두 옛 값으로 강제 복원. role 변경은 admin만, status는 officer 이상만. | B-05 |
+| `20260520000013_dues_memo_public.sql` | `dues_payment.memo_public boolean default false` 추가 + 회원용 뷰 `dues_payment_member_view` (memo 마스킹) + BEFORE UPDATE 트리거로 비-officer의 memo/memo_public 변경 차단. | B-03 |
+| `20260520000014_list_dues_unpaid_v2.sql` | `list_dues_unpaid(p_dues_term_id uuid, p_include_inactive boolean default true)` 시그니처로 교체. 정지/탈퇴/반려 회원 미납도 기본 포함. `member_status`/`memo_public` 컬럼 추가하여 UI에서 섹션 분리 가능. 익명 placeholder는 항상 제외. | B-04 |
+
+### 8.2 변경된 RPC 시그니처
+
+| RPC | v0.1 | v0.2 |
+|-----|------|------|
+| `reject_membership(p_user_id, p_reason)` | `status='suspended'` 로 설정 | `status='rejected'` 로 설정 (+ `rejection_reason` 동시 저장) |
+| `approve_membership(p_user_id)` | status='active' | (동일) + `rejected_reason`/`rejection_reason` null 초기화 |
+| `list_dues_unpaid(p_dues_term_id)` | active 회원만, 반환 컬럼 6개 | `list_dues_unpaid(p_dues_term_id, p_include_inactive default true)`, 반환 컬럼 9개 (`member_status`, `memo_public` 추가) |
+
+### 8.3 신규 컬럼 / 뷰
+
+- `profiles.rejection_reason text` — 가입 반려 사유. 회원 본인에게 노출 가능.
+- `dues_payment.memo_public boolean not null default false` — 회원에게 memo 공개 여부.
+- `public.dues_payment_member_view` — 회원용 뷰. memo가 `is_officer()` 또는 (본인 행 AND memo_public=true)일 때만 노출, 그 외엔 NULL.
+
+### 8.4 권한 매트릭스 보강 (§4.2 갱신)
+
+| 테이블 | 컬럼/액션 | 비회원 | 회원(active) | 임원 | 관리자 |
+|--------|----------|--------|--------------|------|--------|
+| `profiles` | `role` UPDATE | × | × (트리거 차단) | × (트리거 차단) | ○ |
+| `profiles` | `status` UPDATE | × | × (트리거 차단) | ○ (RPC 권장) | ○ |
+| `profiles` | `approved_*`, `rejected_*`, `rejection_reason` | × | × (트리거 차단) | ○ | ○ |
+| `profiles` | `email` UPDATE | × | × (auth.users가 source) | × | ○ (예외) |
+| `profiles` | `is_anonymous_placeholder` | × | × | × | ○ |
+| `profiles` | `deleted_at` (self soft delete) | × | ○ (본인) | ○ | ○ |
+| `dues_payment` | `memo`, `memo_public` UPDATE | × | × (트리거+RLS 차단) | ○ | ○ |
+| `dues_payment_member_view` SELECT | × | 본인 행 + memo 마스킹 | 전체 (raw memo) | 전체 | — |
+
+### 8.5 ERD 변경 (델타)
+
+```
+profiles {
+  + text rejection_reason
+}
+dues_payment {
+  + bool memo_public
+}
+profile_status ENUM:
+  pending → active → (rejected | suspended | withdrawn)
+```
+
+### 8.6 Frontend 가이드 (필수 반영 사항)
+
+1. **middleware**: `profile.status === 'rejected'` 분기 추가. `/login?reason=rejected` 또는 별도 `/rejected` 안내 페이지로 라우팅. `profiles.rejection_reason` 표시.
+2. **회원용 회비 조회**: `lib/api/dues.ts:listMyDues`가 `from('dues_payment')` 대신 `from('dues_payment_member_view')` 호출하도록 변경. `memo` 컬럼은 마스킹된 값이므로 NULL 가능.
+3. **DuesEditSheet**: `memo_public` 체크박스 추가 ("회원에게 메모 공개"). 저장 시 `update({ ..., memo, memo_public })`.
+4. **DuesHistoryCard**: `row.memo`가 null이면 메모 영역 미렌더. (혹은 memo_public 컬럼을 직접 받아 분기.)
+5. **미납자 화면**: `rpc('list_dues_unpaid', { p_dues_term_id, p_include_inactive: true })`로 호출. 반환 row의 `member_status`로 active/inactive 섹션 분리(예: "활동 회원 / 정지·탈퇴 회원"). CSV 내보내기 시에도 member_status 포함 권장.
+6. **반려 안내**: 로그인 시 `status === 'rejected'`이면 `profiles.rejection_reason` 노출 및 임원 연락 안내.
+7. **권한 직접 update 금지 (이미 트리거가 차단)**: 클라이언트에서 `profiles` 테이블의 role/status를 직접 update 하지 말 것. 시도해도 트리거가 옛 값으로 복원하므로 결과 없음(에러도 안 남) — 임원 권한 위임은 `grant_officer`/`revoke_officer` RPC 사용.
 
 ---
 
