@@ -39,9 +39,14 @@ interface SkippedRow {
 // reason 코드 → 한국어 라벨.
 const SKIP_REASON_LABEL: Record<string, string> = {
   already_paid: '이미 납부 처리됨',
+  pending_mismatch: '회원 신고 금액과 다름',
+  amount_mismatch: '항목 금액과 다름 (부분납부 추정)',
+  invalid_status: '처리 불가 상태',
+  update_failed: '동시 변경 — 재시도 필요',
+  not_found: '항목을 찾을 수 없음',
+  // 하위 호환 (구 키)
   report_mismatch: '회원 신고 금액과 다름',
   conflict: '상태 충돌',
-  not_found: '항목을 찾을 수 없음',
 };
 
 function describeSkip(reason: string): string {
