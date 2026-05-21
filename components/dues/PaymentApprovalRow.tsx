@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { TextArea } from '@/components/ui/TextArea';
 import { formatDateTime, formatKRW } from '@/lib/utils/format';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 export interface ApprovalReport {
   id: string;
@@ -30,6 +31,8 @@ export function PaymentApprovalRow({ report, onApprove, onReject }: Props) {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [removed, setRemoved] = useState(false);
+  // QA P1-2: 반려 다이얼로그 내부로 포커스 가두기.
+  const rejectTrapRef = useFocusTrap<HTMLDivElement>(rejectOpen);
 
   const amountMismatch =
     report.reportedAmountKrw !== report.termAmountKrw;
@@ -130,7 +133,10 @@ export function PaymentApprovalRow({ report, onApprove, onReject }: Props) {
           aria-modal="true"
           aria-label="신고 반려 사유 입력"
         >
-          <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6">
+          <div
+            ref={rejectTrapRef}
+            className="w-full max-w-sm rounded-lg border border-border bg-surface p-6"
+          >
             <h2 className="text-lg font-semibold text-text-primary">
               {report.memberName}님 신고 반려
             </h2>

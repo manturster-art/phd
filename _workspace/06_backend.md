@@ -6,11 +6,13 @@
 > 작성일: 2026-05-20
 > 입력: `_workspace/06_pm.md` v0.1, `_workspace/03_backend_design.md` v0.2, `supabase/migrations/20260520000006_dues.sql`, `supabase/migrations/20260520000013_dues_memo_public.sql`
 > 산출물: 본 문서 + `supabase/migrations/20260520000015_dues_bank_integration.sql`
+>           + `supabase/migrations/20260520000016_dues_match_log_amount_mismatch_label.sql` (v0.4)
 
 ## 변경 로그
 | 날짜 | 버전 | 변경 |
 |------|------|------|
 | 2026-05-20 | v0.1 | PM 06 기반 초안. status 확장(`pending_payment`/`rejected`), reported_*/rejection_reason/match_source/bank_account_id 컬럼, dues_match_log 신규, RLS·가드 트리거. |
+| 2026-05-21 | v0.4 | **QA P0-1 픽스 + PM 결정 반영**. commit API 에 status/금액 충돌 검사 추가, 매칭 알고리즘에 `amount_mismatch` 라벨 도입(부분/초과 자동 매칭 금지), match_log CHECK 제약에 `amount_mismatch` 추가. 응답 스키마에 `{confirmed, skipped[]}` 신규 필드. |
 
 ---
 
@@ -472,5 +474,100 @@ match_source:     'manual' | 'member_report' | 'csv_upload' | null;
 | BE-Q1 | CSV commit 트랜잭션 단위: row별 or 전체 | 현재 row별 (부분 성공 허용). 전체 롤백을 원하면 단일 RPC `apply_dues_csv_batch(jsonb)` 추가 마이그레이션 필요. |
 | BE-Q2 | `dues_match_log` 보존 cron | 권장 2년. cron 미구현. P2에서 `pg_cron` 또는 외부 스케줄러로 추가. |
 | BE-Q3 | `bank_account_id` FK 도입 시점 | 본 범위 밖. 신규 `bank_account` 테이블 + FK 추가 마이그레이션 별도. |
-| BE-Q4 | 회원의 `partial` 신고 (5만 → 3만 입금) | reported_amount 자유 저장. 임원이 컨펌 시 status='partial' + paid_amount_krw 설정하도록 임원 UI에 분기 둘지 PM 결정 필요. 현재 RPC 명세는 단순 `paid` 처리. |
+| BE-Q4 | 회원의 `partial` 신고 (5만 → 3만 입금) | **PM 결정 (v0.4): 부분/초과 납부는 자동 매칭 거부 = 임원 수동 처리.** 매칭 알고리즘이 `amount_mismatch` 라벨로 분류하여 임원이 후보 시트에서 수동 선택해야 한다. §10 참조. |
 | BE-Q5 | 신고 cooldown | 없음. 회원이 `pending_payment → unpaid → pending_payment` 무한 반복 가능. 악용 사례 발견 시 rate limit 추가. |
+
+---
+
+## 10. v0.4 — 충돌 처리 정책 & 부분납부 정책 (QA P0-1 픽스)
+
+### 10.1 매칭 라벨 enum (v0.4)
+
+```
+DuesMatchKind  (parse 단계 결과, UI 그룹화 기준)
+  ├─ auto             — 자동 확정 가능 (matchType: auto_exact | auto_pattern | auto_oldest)
+  ├─ multi            — 후보 ≥2 (동명이인 또는 정확금액 일치 후보 다수)
+  ├─ none             — 매칭 가능한 회원/항목 없음
+  └─ amount_mismatch  — (v0.4 신규) 이름 매칭은 됐으나 회비 항목 금액과 CSV 금액이 다름. 자동 금지.
+
+DuesMatchType  (행 단위 세부 분류)
+  auto_exact | auto_pattern | auto_oldest | manual | amount_mismatch | conflict
+                                                       └ parse        └ commit 응답 전용
+```
+
+- `amount_mismatch` 는 parse 단계에서 결정되며 `dues_match_log.match_type` 에도 기록 가능 (CHECK 허용).
+- `conflict` 는 **DB 에 절대 기록되지 않음** — commit 응답 `skipped[].reason` 에서만 사용. (DuesMatchTypeLog 타입으로 DB 컬럼은 분리.)
+
+### 10.2 부분납부 정책 (BE-Q4 PM 결정)
+
+- 매칭 알고리즘 (`lib/dues/matcher.ts`):
+  - 이름 매칭 + 미납 1건:
+    - 항목 금액 == CSV 금액 → `auto_oldest`
+    - **항목 금액 != CSV 금액 → `amount_mismatch`** (kind=`amount_mismatch`, matchType=`amount_mismatch`, matchedPaymentId=null, candidates=원본 1건)
+  - 이름 매칭 + 미납 다수, 정확 금액 일치 후보 0건:
+    - **모두 부분/초과 → `amount_mismatch`** (candidates=미납 전체, recommended=가장 오래된)
+  - "이름/항목" 패턴 매칭에서도 동일하게 금액 일치 시 `auto_pattern`, 불일치 시 `amount_mismatch`.
+- UI: `TransactionReviewTable` 의 '⚠ 후보' 탭에 `multi + amount_mismatch` 가 함께 노출되며,
+  amount_mismatch 행에는 `"⚠ 항목 금액과 입금액이 달라요. 부분/초과 납부인지 확인 후 수동 선택해주세요."` 경고가 표시된다.
+- 임원이 수동으로 후보를 선택하면 `matchType: 'manual'` 로 일괄 확정에 포함된다 (매칭 알고리즘과 별개로 임원의 의지로 확정).
+- 부분납부 시 `status='partial'` + `paid_amount_krw < amount_krw` 처리는 본 범위 밖 — 임원이 컨펌 화면에서 수동 결정한다.
+
+### 10.3 충돌 처리 정책 (P0-1 픽스, CSV commit)
+
+`POST /api/dues/admin/transactions/commit` 처리 흐름 (각 row 단위):
+
+| # | 검사 | Skip 사유 (`reason`) | 비고 |
+|---|------|---------------------|------|
+| 0 | `matchType === 'amount_mismatch'` | `amount_mismatch` | 클라이언트가 부분/초과 행을 commit 에 포함한 경우 사전 차단 |
+| 1 | payment row SELECT 실패 / 없음 | `not_found` | UUID 변조/삭제 등 |
+| 2 | `status === 'paid'` | `already_paid` | **멱등성**: 같은 commit 요청을 두 번 보내도 첫 번째 이후는 모두 `already_paid` skip |
+| 3 | `status ∉ {unpaid, pending_payment}` | `invalid_status` | exempt/partial/rejected 상태 — 임원 컨펌 화면에서 별도 처리 |
+| 4 | `status === 'pending_payment'` 이고 `reported_amount !== CSV.amount` | `pending_mismatch` | 회원 신고를 추인하지 않음. 임원이 컨펌 화면에서 수동 처리 |
+| 5 | UPDATE 시 optimistic concurrency 실패 (status 동시 변경) | `invalid_status` | `WHERE status = $cur.status` 매칭 0건 |
+| 6 | UPDATE 또는 match_log INSERT 실패 | `update_failed` | DB 에러 메시지를 `detail` 에 포함 |
+
+추인 정상 경로:
+
+- `unpaid + 어떤 금액` → 매칭 알고리즘에서 `auto_exact` / `auto_pattern` / `auto_oldest` 로 분류된 경우만 commit 에 도달 (매칭 단계에서 금액 검증 완료) → paid 전이.
+- `pending_payment + reported_amount === CSV.amount` → 회원 신고 추인 → paid 전이.
+
+### 10.4 응답 스키마 (v0.4)
+
+```ts
+type CommitResponse = {
+  confirmed: number;                  // paid 로 전이된 row 수
+  skipped: Array<{
+    paymentId: string;
+    reason:
+      | 'already_paid'
+      | 'pending_mismatch'
+      | 'invalid_status'
+      | 'amount_mismatch'
+      | 'not_found'
+      | 'update_failed';
+    detail?: string;                  // 사용자 표시용 한국어 메시지
+  }>;
+  // 하위 호환 (v0.3 클라이언트):
+  ok: number;                         // === confirmed
+  failed: number;                     // === skipped.length
+  failures: Array<{ paymentId: string; reason: string }>;
+};
+```
+
+**Frontend 인계 노트**:
+- 응답의 `skipped[]` 를 받아 "충돌-검토필요" UI 슬롯에 노출.
+- `reason` 별로 한국어 라벨 매핑:
+  - `already_paid`     → "이미 납부 처리됨"
+  - `pending_mismatch` → "회원 신고 금액과 다름 — 컨펌 화면에서 확인"
+  - `invalid_status`   → "현재 상태에서 자동 확정 불가"
+  - `amount_mismatch`  → "항목 금액과 입금액 불일치 — 수동 선택 필요"
+  - `not_found`        → "회비 항목을 찾을 수 없음"
+  - `update_failed`    → "DB 갱신 실패 (재시도 가능)"
+- `TransactionsUploadFlow` 는 skipped.length > 0 시 토스트를 `"N건 확정 · M건 충돌(검토 필요)"` 로 표시 (v0.4 적용 완료).
+
+### 10.5 마이그레이션
+
+- `20260520000016_dues_match_log_amount_mismatch_label.sql` — add-only.
+  - `dues_match_log.match_type` CHECK 제약을 재정의하여 `amount_mismatch` 추가.
+  - `conflict` 는 commit 응답 전용이므로 DB 에 추가하지 않음.
+  - 기존 마이그레이션 `20260520000015_dues_bank_integration.sql` 은 **수정하지 않음** (add-only 원칙).

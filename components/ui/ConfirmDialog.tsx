@@ -3,6 +3,7 @@
 
 import { useEffect } from 'react';
 import { Button } from './Button';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface Props {
   open: boolean;
@@ -25,6 +26,9 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
 }: Props) {
+  // QA P1-2: 다이얼로그 내부 포커스 trap.
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -43,7 +47,10 @@ export function ConfirmDialog({
       aria-modal="true"
       aria-label={title}
     >
-      <div className="w-full max-w-sm rounded-lg border border-border bg-surface p-6">
+      <div
+        ref={trapRef}
+        className="w-full max-w-sm rounded-lg border border-border bg-surface p-6"
+      >
         <h2 className="text-lg font-semibold text-text-primary">{title}</h2>
         {message && (
           <p className="mt-2 text-sm text-text-secondary">{message}</p>

@@ -3,12 +3,18 @@
 // CSV 거래내역 ↔ dues_payment 매칭 알고리즘.
 // 백엔드 명세 (06_backend §5.3) 의사코드 그대로 구현.
 //
-// 규칙 우선순위:
+// 규칙 우선순위 (v0.4 — PM 결정 사항 반영):
 //   1. 동명이인(이름 같은 active 회원 ≥2명) → 항상 'multi' (자동 금지) — PM Q5
 //   2. 이름+금액 정확일치 (1건) → 'auto_exact'
 //   3. "이름/항목명" 패턴 (payerName 또는 memo 의 '/' 분리) → 'auto_pattern'
-//   4. 이름 매칭 + 미납 1건 → 'auto_oldest'
-//   5. 이름 매칭 + 미납 다수 → 'multi'
+//      ※ pattern 매칭 시에도 금액이 항목 금액과 다르면 'amount_mismatch'.
+//   4. 이름 매칭 + 미납 1건:
+//        4-a. 항목 금액 == CSV 금액 → 'auto_oldest'
+//        4-b. 항목 금액 != CSV 금액 → 'amount_mismatch' (부분/초과 납부, 임원 수동 처리) — PM BE-Q4
+//   5. 이름 매칭 + 미납 다수:
+//        5-a. 정확 금액 일치 후보 1건 → 'auto_exact'
+//        5-b. 정확 금액 일치 후보 ≥2건 → 'multi'
+//        5-c. 정확 금액 일치 후보 0건 → 'amount_mismatch' (부분/초과)
 //   6. 그 외 → 'none'
 // =====================================================================
 
@@ -154,17 +160,31 @@ function match(
       return makeRow(tx, 'multi', null, exact, null);
     }
 
-    // 4) 미납 1건 → auto_oldest (단일이라 사실상 그게 곧 가장 오래된)
+    // 4) 미납 1건
     if (unpaid.length === 1) {
-      return makeRow(tx, 'auto', 'auto_oldest', unpaid, unpaid[0].paymentId);
+      const only = unpaid[0];
+      if (only.termAmountKrw === tx.rawAmountKrw) {
+        // 4-a. 금액 일치 — auto_oldest (단일이라 사실상 그게 곧 가장 오래된)
+        return makeRow(tx, 'auto', 'auto_oldest', unpaid, only.paymentId);
+      }
+      // 4-b. 금액 불일치 — 부분/초과 납부. 자동 매칭 거부 (PM BE-Q4).
+      //      후보 자체는 유지하여 임원이 수동 선택 가능하도록 한다.
+      return makeRow(tx, 'amount_mismatch', 'amount_mismatch', unpaid, null);
     }
 
-    // 5) 미납 다수, 금액 불일치 → multi (UI 에서 추천=가장 오래된)
+    // 5) 미납 다수, 정확 금액 일치 후보 없음 → amount_mismatch (부분/초과)
+    //    UI 에서 추천=가장 오래된 으로 표시하여 임원이 수동 선택 가능.
     const withRecommendation = unpaid.map((p, idx) => ({
       ...p,
       recommended: idx === 0,
     }));
-    return makeRow(tx, 'multi', null, withRecommendation, null);
+    return makeRow(
+      tx,
+      'amount_mismatch',
+      'amount_mismatch',
+      withRecommendation,
+      null
+    );
   }
 
   // 이름 매칭 0건 → "이름/항목" 패턴 시도
@@ -188,7 +208,12 @@ function tryPatternFallback(
     const unpaid = (unpaidByMember[m.id] ?? []).slice().sort(sortByOldest);
     const pmt = findTermPaymentByTokens(unpaid, termPart);
     if (pmt) {
-      return makeRow(tx, 'auto', 'auto_pattern', [pmt], pmt.paymentId);
+      // pattern 매칭은 항목까지 특정되므로 금액 일치 여부로 자동/수동 분기.
+      if (pmt.termAmountKrw === tx.rawAmountKrw) {
+        return makeRow(tx, 'auto', 'auto_pattern', [pmt], pmt.paymentId);
+      }
+      // 부분/초과 — 자동 금지, 후보로 표시.
+      return makeRow(tx, 'amount_mismatch', 'amount_mismatch', [pmt], null);
     }
   }
   return makeRow(tx, 'none', null, [], null);

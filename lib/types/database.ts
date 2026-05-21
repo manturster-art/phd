@@ -25,7 +25,8 @@ export type DuesStatus =
   | 'rejected';
 
 // CSV 매칭 거래 분류 — Designer §3 매칭 매트릭스.
-export type DuesMatchKind = 'auto' | 'multi' | 'none';
+// v0.4: 'amount_mismatch' 추가 (이름 매칭+금액 불일치 = 미매칭과 별도 라벨).
+export type DuesMatchKind = 'auto' | 'multi' | 'none' | 'amount_mismatch';
 // match_log.source_bank / match_type — Backend §1 ERD.
 export type DuesSourceBank =
   | 'kb'
@@ -34,11 +35,35 @@ export type DuesSourceBank =
   | 'kakaobank'
   | 'toss'
   | 'unknown';
+// v0.4: 'amount_mismatch'(이름 매칭+금액 불일치) + 'conflict'(commit 단계 skip 사유) 추가.
+//   - 'amount_mismatch' 는 parse/매칭 단계 결과.
+//   - 'conflict' 는 commit 응답에서 skip 사유로만 사용 (DB match_log 에는 기록하지 않음).
 export type DuesMatchType =
   | 'auto_exact'
   | 'auto_pattern'
   | 'auto_oldest'
-  | 'manual';
+  | 'manual'
+  | 'amount_mismatch'
+  | 'conflict';
+
+// DB dues_match_log.match_type 컬럼이 허용하는 값 (CHECK 제약).
+// - 'conflict' 는 commit 응답 전용 라벨이므로 DB 에는 기록되지 않는다.
+export type DuesMatchTypeLog = Exclude<DuesMatchType, 'conflict'>;
+
+// commit 응답 skip 사유 라벨.
+// - 'already_paid'     : 이미 paid 처리됨.
+// - 'pending_mismatch' : pending_payment 인데 CSV 금액 ≠ reported_amount.
+// - 'invalid_status'   : 상태가 unpaid/pending_payment 가 아님 (exempt/partial/rejected).
+// - 'amount_mismatch'  : 이름 매칭은 됐으나 회비 항목 금액과 CSV 금액 불일치 (부분/초과 납부, 자동 처리 거부).
+// - 'not_found'        : payment row 없음.
+// - 'update_failed'    : DB 갱신 실패.
+export type DuesCommitSkipReason =
+  | 'already_paid'
+  | 'pending_mismatch'
+  | 'invalid_status'
+  | 'amount_mismatch'
+  | 'not_found'
+  | 'update_failed';
 // dues_payment.match_source — paid 전이 출처.
 export type DuesMatchSource = 'manual' | 'member_report' | 'csv_upload';
 export type NotificationKind =
@@ -400,7 +425,7 @@ export interface Database {
           raw_amount: number | null;
           raw_transaction_date: string | null;
           source_bank: DuesSourceBank;
-          match_type: DuesMatchType;
+          match_type: DuesMatchTypeLog;
           matched_at: string;
           matched_by: string | null;
         };
@@ -412,7 +437,7 @@ export interface Database {
           raw_amount?: number | null;
           raw_transaction_date?: string | null;
           source_bank: DuesSourceBank;
-          match_type: DuesMatchType;
+          match_type: DuesMatchTypeLog;
           matched_at?: string;
           matched_by?: string | null;
         };
@@ -424,7 +449,7 @@ export interface Database {
           raw_amount?: number | null;
           raw_transaction_date?: string | null;
           source_bank?: DuesSourceBank;
-          match_type?: DuesMatchType;
+          match_type?: DuesMatchTypeLog;
           matched_at?: string;
           matched_by?: string | null;
         };

@@ -20,13 +20,35 @@ export default function DemoDuesAdminPage() {
   const toast = useToast();
   const [pending, setPending] = useState(demoPendingPayments);
 
+  // QA P1-4 (데모): 컨펌/반려 후 5초간 [실행취소] 토스트.
+  const undo = (row: (typeof demoPendingPayments)[number]) => {
+    setPending((prev) => (prev.find((p) => p.id === row.id) ? prev : [row, ...prev]));
+    toast.show('처리를 취소했어요.', 'info');
+  };
+
   const onApprove = (id: string) => {
+    const row = pending.find((r) => r.id === id);
     setPending((p) => p.filter((r) => r.id !== id));
-    toast.show('납부 처리 완료', 'success');
+    if (row) {
+      toast.show('납부 처리 완료', 'success', {
+        action: { label: '실행취소', onClick: () => undo(row) },
+        durationMs: 5000,
+      });
+    } else {
+      toast.show('납부 처리 완료', 'success');
+    }
   };
   const onReject = (id: string, reason: string) => {
+    const row = pending.find((r) => r.id === id);
     setPending((p) => p.filter((r) => r.id !== id));
-    toast.show(`반려되었어요: ${reason.slice(0, 20)}…`, 'info');
+    if (row) {
+      toast.show(`반려되었어요: ${reason.slice(0, 20)}…`, 'info', {
+        action: { label: '실행취소', onClick: () => undo(row) },
+        durationMs: 5000,
+      });
+    } else {
+      toast.show(`반려되었어요: ${reason.slice(0, 20)}…`, 'info');
+    }
   };
 
   return (

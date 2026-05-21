@@ -29,6 +29,25 @@ const BANK_LABEL: Record<DuesSourceBank, string> = {
   unknown: '미인식 양식',
 };
 
+// QA P0/P1 협업: commit 응답에 포함된 skipped 행. 백엔드가 v0.4 에서 추가.
+interface SkippedRow {
+  paymentId: string;
+  reason: string;
+  detail?: string;
+}
+
+// reason 코드 → 한국어 라벨.
+const SKIP_REASON_LABEL: Record<string, string> = {
+  already_paid: '이미 납부 처리됨',
+  report_mismatch: '회원 신고 금액과 다름',
+  conflict: '상태 충돌',
+  not_found: '항목을 찾을 수 없음',
+};
+
+function describeSkip(reason: string): string {
+  return SKIP_REASON_LABEL[reason] ?? reason;
+}
+
 export function TransactionsUploadFlow() {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -36,6 +55,8 @@ export function TransactionsUploadFlow() {
   const [fileName, setFileName] = useState<string | null>(null);
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [committing, setCommitting] = useState(false);
+  // QA P0-1 협업: commit 응답의 skipped 행을 별도 "검토 필요" 섹션에 노출.
+  const [skipped, setSkipped] = useState<SkippedRow[]>([]);
 
   const onFile = async (file: File) => {
     setBusy(true);
@@ -59,7 +80,7 @@ export function TransactionsUploadFlow() {
         rawMemo: string | null;
         rawAmountKrw: number;
         rawTransactionDate: string;
-        kind: 'auto' | 'multi' | 'none';
+        kind: 'auto' | 'multi' | 'none' | 'amount_mismatch';
         matchType: DuesMatchType | null;
         candidates: Array<{
           paymentId: string;
@@ -128,6 +149,7 @@ export function TransactionsUploadFlow() {
       return;
     }
     setCommitting(true);
+    setSkipped([]);
     try {
       const payload = rows
         .filter((r) => r.kind === 'auto' && r.matchedPaymentId)
@@ -152,14 +174,41 @@ export function TransactionsUploadFlow() {
         toast.show(`확정 실패: ${e.error ?? res.status}`, 'error');
         return;
       }
-      const json = await res.json();
-      toast.show(
-        `${json.ok}건 납부 처리 완료 · 업로드한 파일은 폐기되었습니다.`,
-        'success'
-      );
-      setRows([]);
-      setBank(null);
-      setFileName(null);
+      const json = (await res.json()) as {
+        confirmed?: number;
+        ok?: number;
+        failed?: number;
+        skipped?: SkippedRow[];
+        failures?: Array<{ paymentId: string; reason: string }>;
+      };
+      // v0.4: confirmed 우선, 하위 호환으로 ok 도 인정.
+      const confirmedCount = json.confirmed ?? json.ok ?? 0;
+      // skipped 가 없으면 failures(구 응답) 를 폴백으로 사용.
+      const skippedRows: SkippedRow[] =
+        json.skipped && json.skipped.length > 0
+          ? json.skipped
+          : (json.failures ?? []).map((f) => ({
+              paymentId: f.paymentId,
+              reason: f.reason,
+            }));
+
+      if (skippedRows.length > 0) {
+        // P0-1 픽스: 충돌 행이 있으면 임원에게 알림 + 검토 섹션 표시.
+        setSkipped(skippedRows);
+        toast.show(
+          `${confirmedCount}건 확정 · ${skippedRows.length}건 검토 필요`,
+          'info'
+        );
+        // 검토 필요 행이 있을 때는 매칭 결과를 유지해 임원이 다시 살펴볼 수 있게 함.
+      } else {
+        toast.show(
+          `${confirmedCount}건 납부 처리 완료 · 업로드한 파일은 폐기되었습니다.`,
+          'success'
+        );
+        setRows([]);
+        setBank(null);
+        setFileName(null);
+      }
     } finally {
       setCommitting(false);
     }
@@ -174,6 +223,7 @@ export function TransactionsUploadFlow() {
       setRows([]);
       setBank(null);
       setFileName(null);
+      setSkipped([]);
     }
   };
 
@@ -221,7 +271,8 @@ export function TransactionsUploadFlow() {
               <button
                 type="button"
                 onClick={onDiscard}
-                className="ml-auto text-xs text-primary-500 underline-offset-2 hover:underline"
+                // QA P1-3: 44px 터치 타깃 보강 (모바일 mis-tap 방지).
+                className="ml-auto inline-flex min-h-[44px] items-center rounded-pill px-3 text-xs text-primary-500 underline-offset-2 hover:underline focus-visible:outline-none focus-visible:shadow-focus"
               >
                 다른 파일 선택
               </button>
@@ -231,6 +282,40 @@ export function TransactionsUploadFlow() {
               rows={rows}
               onPickCandidate={onPickCandidate}
             />
+
+            {skipped.length > 0 && (
+              <section
+                aria-label="검토 필요 거래"
+                className="rounded-lg border border-warning bg-warning-bg px-4 py-4"
+              >
+                <h3 className="text-sm font-semibold text-warning">
+                  ⚠ 검토 필요 {skipped.length}건
+                </h3>
+                <p className="mt-1 text-xs text-text-secondary">
+                  아래 거래는 일괄 확정에서 제외되었습니다. 회원 신고와의 충돌 또는 이미 처리된 항목입니다. 개별 컨펌 화면에서 확인해주세요.
+                </p>
+                <ul className="mt-3 space-y-2">
+                  {skipped.map((s) => (
+                    <li
+                      key={s.paymentId}
+                      className="rounded-md border border-border bg-surface px-3 py-2 text-sm"
+                    >
+                      <p className="font-medium text-text-primary">
+                        {describeSkip(s.reason)}
+                      </p>
+                      {s.detail && (
+                        <p className="mt-0.5 text-xs text-text-secondary">
+                          {s.detail}
+                        </p>
+                      )}
+                      <p className="mt-0.5 text-xs text-text-muted">
+                        paymentId: {s.paymentId.slice(0, 8)}…
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
           </>
         )}
 

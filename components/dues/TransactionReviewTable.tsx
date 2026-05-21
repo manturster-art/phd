@@ -64,14 +64,25 @@ export function TransactionReviewTable({ rows, onPickCandidate }: Props) {
         acc[r.kind] = (acc[r.kind] ?? 0) + 1;
         return acc;
       },
-      { auto: 0, multi: 0, none: 0 } as Record<DuesMatchKind, number>
+      { auto: 0, multi: 0, none: 0, amount_mismatch: 0 } as Record<
+        DuesMatchKind,
+        number
+      >
     );
   }, [rows]);
 
+  // v0.4: '후보' 탭은 multi + amount_mismatch (수동 처리가 필요한 거래) 를 함께 노출.
   const filtered = useMemo(
-    () => rows.filter((r) => r.kind === tab),
+    () =>
+      rows.filter((r) =>
+        tab === 'multi'
+          ? r.kind === 'multi' || r.kind === 'amount_mismatch'
+          : r.kind === tab
+      ),
     [rows, tab]
   );
+
+  const candidateCount = counts.multi + counts.amount_mismatch;
 
   const sheetRow = useMemo(
     () => (sheetRowId ? rows.find((r) => r.id === sheetRowId) ?? null : null),
@@ -85,7 +96,7 @@ export function TransactionReviewTable({ rows, onPickCandidate }: Props) {
         onChange={(v) => setTab(v)}
         options={[
           { label: `✅ 자동 ${counts.auto}`, value: 'auto' },
-          { label: `⚠ 후보 ${counts.multi}`, value: 'multi' },
+          { label: `⚠ 후보 ${candidateCount}`, value: 'multi' },
           { label: `❌ 미매칭 ${counts.none}`, value: 'none' },
         ]}
       />
@@ -124,18 +135,26 @@ export function TransactionReviewTable({ rows, onPickCandidate }: Props) {
                     {formatKRW(row.candidates[0].termAmountKrw)})
                   </p>
                 )}
-                {row.kind === 'multi' && (
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-text-secondary">
-                      후보 {row.candidates.length}건
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => setSheetRowId(row.id)}
-                      className="rounded-pill px-2 text-sm text-primary-500 underline-offset-2 hover:underline active:scale-95 transition-transform"
-                    >
-                      선택하기 →
-                    </button>
+                {(row.kind === 'multi' || row.kind === 'amount_mismatch') && (
+                  <div className="space-y-2">
+                    {row.kind === 'amount_mismatch' && (
+                      <p className="text-xs text-warning">
+                        ⚠ 항목 금액과 입금액이 달라요. 부분/초과 납부인지 확인 후 수동 선택해주세요.
+                      </p>
+                    )}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-text-secondary">
+                        후보 {row.candidates.length}건
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setSheetRowId(row.id)}
+                        // QA P1-3: 모바일 44px 터치 타깃 충족.
+                        className="inline-flex min-h-[44px] min-w-[88px] items-center justify-center rounded-pill border border-primary-500 px-4 text-sm text-primary-500 active:scale-95 transition-transform focus-visible:outline-none focus-visible:shadow-focus"
+                      >
+                        선택하기 →
+                      </button>
+                    </div>
                   </div>
                 )}
                 {row.kind === 'none' && (
@@ -198,7 +217,7 @@ function CandidatePickSheet({
           <li key={c.paymentId}>
             <label
               className={cn(
-                'flex items-center gap-3 rounded-lg border bg-surface px-4 py-3 cursor-pointer',
+                'flex min-h-[44px] items-center gap-3 rounded-lg border bg-surface px-4 py-3 cursor-pointer',
                 picked === c.paymentId
                   ? 'border-primary-500'
                   : 'border-border'

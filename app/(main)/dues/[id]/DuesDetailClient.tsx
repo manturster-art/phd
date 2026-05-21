@@ -4,11 +4,12 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import { DuesStatusBadge } from '@/components/dues/DuesStatusBadge';
 import { PaymentReportSheet } from '@/components/dues/PaymentReportSheet';
 import { createClient } from '@/lib/supabase/client';
-import { reportMyDuesPayment } from '@/lib/api/dues';
+import { reportMyDuesPayment, cancelMyDuesReport } from '@/lib/api/dues';
 import { formatDateTime, formatKRW } from '@/lib/utils/format';
 import type { DuesStatus } from '@/lib/types/database';
 
@@ -34,6 +35,28 @@ export function DuesDetailClient({
   const router = useRouter();
   const toast = useToast();
   const [open, setOpen] = useState(false);
+  // QA P1-1 (US-C04): 신고 취소 확인 다이얼로그 + 진행 상태.
+  const [cancelOpen, setCancelOpen] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  const onCancelReport = async () => {
+    if (cancelling) return;
+    setCancelling(true);
+    try {
+      const supabase = createClient();
+      await cancelMyDuesReport(supabase, paymentId);
+      toast.show('신고를 취소했어요.', 'info');
+      setCancelOpen(false);
+      router.refresh();
+    } catch (e: unknown) {
+      toast.show(
+        e instanceof Error ? e.message : '신고 취소에 실패했어요',
+        'error'
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   const onSubmit = async (input: {
     reportedAt: string;
@@ -86,16 +109,27 @@ export function DuesDetailClient({
       )}
 
       {status === 'pending_payment' && (
-        <div className="mt-3 space-y-1">
-          {reportedAt && (
+        <div className="mt-3 space-y-3">
+          <div className="space-y-1">
+            {reportedAt && (
+              <p className="text-sm text-text-secondary">
+                {formatDateTime(reportedAt)} 신고 ·{' '}
+                {formatKRW(reportedAmount ?? termAmountKrw)}
+              </p>
+            )}
             <p className="text-sm text-text-secondary">
-              {formatDateTime(reportedAt)} 신고 ·{' '}
-              {formatKRW(reportedAmount ?? termAmountKrw)}
+              처리되면 알림으로 알려드릴게요.
             </p>
-          )}
-          <p className="text-sm text-text-secondary">
-            처리되면 알림으로 알려드릴게요.
-          </p>
+          </div>
+          {/* QA P1-1 / US-C04: 회원이 본인 신고를 임원 처리 전에 취소. */}
+          <Button
+            variant="ghost"
+            fullWidth
+            onClick={() => setCancelOpen(true)}
+            disabled={cancelling}
+          >
+            신고 취소
+          </Button>
         </div>
       )}
 
@@ -131,6 +165,17 @@ export function DuesDetailClient({
         termAmountKrw={termAmountKrw}
         previousRejectionReason={status === 'rejected' ? rejectionReason : null}
         onSubmit={onSubmit}
+      />
+
+      <ConfirmDialog
+        open={cancelOpen}
+        title="신고를 취소할까요?"
+        message="신고를 취소하면 다시 미납 상태로 돌아갑니다."
+        confirmLabel="신고 취소"
+        cancelLabel="유지"
+        danger
+        onConfirm={onCancelReport}
+        onCancel={() => setCancelOpen(false)}
       />
     </section>
   );

@@ -4,6 +4,7 @@
 
 import { useEffect, type ReactNode } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 interface SheetProps {
   open: boolean;
@@ -13,6 +14,9 @@ interface SheetProps {
 }
 
 export function Sheet({ open, onClose, title, children }: SheetProps) {
+  // QA P1-2: 포커스가 시트 내부에 갇히도록 trap. ESC 처리는 그대로 유지.
+  const trapRef = useFocusTrap<HTMLDivElement>(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -37,6 +41,7 @@ export function Sheet({ open, onClose, title, children }: SheetProps) {
       onClick={onClose}
     >
       <div
+        ref={trapRef}
         className={cn(
           'w-full max-w-app bg-surface p-6',
           'rounded-t-lg border-t border-x border-border',

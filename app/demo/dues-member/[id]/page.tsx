@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { AppBar } from '@/components/layout/AppBar';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { useToast } from '@/components/ui/Toast';
 import { BankRuleBanner } from '@/components/dues/BankRuleBanner';
 import { DuesStatusBadge } from '@/components/dues/DuesStatusBadge';
@@ -22,6 +23,8 @@ export default function DemoDuesMemberDetailPage() {
 
   const detail = demoDuesDetails[params.id];
   const [open, setOpen] = useState(false);
+  // QA P1-1 (US-C04 데모): 신고 취소 다이얼로그 상태.
+  const [cancelOpen, setCancelOpen] = useState(false);
   // 데모: 신고 후 상태 변경을 로컬에서 흉내냄 (서버 호출 없음).
   const [status, setStatus] = useState<DuesStatus>(
     (detail?.status ?? 'unpaid') as DuesStatus
@@ -121,14 +124,24 @@ export default function DemoDuesMemberDetailPage() {
           )}
 
           {status === 'pending_payment' && (
-            <div className="mt-3 space-y-1">
-              <p className="text-sm text-text-secondary">
-                {reportedAt && formatDateTime(reportedAt)} 신고 ·{' '}
-                {formatKRW(reportedAmount)}
-              </p>
-              <p className="text-sm text-text-secondary">
-                처리되면 알림으로 알려드릴게요.
-              </p>
+            <div className="mt-3 space-y-3">
+              <div className="space-y-1">
+                <p className="text-sm text-text-secondary">
+                  {reportedAt && formatDateTime(reportedAt)} 신고 ·{' '}
+                  {formatKRW(reportedAmount)}
+                </p>
+                <p className="text-sm text-text-secondary">
+                  처리되면 알림으로 알려드릴게요.
+                </p>
+              </div>
+              {/* QA P1-1 (US-C04 데모): mock 취소 흐름. */}
+              <Button
+                variant="ghost"
+                fullWidth
+                onClick={() => setCancelOpen(true)}
+              >
+                신고 취소
+              </Button>
             </div>
           )}
 
@@ -181,6 +194,23 @@ export default function DemoDuesMemberDetailPage() {
           status === 'rejected' ? detail.rejectionReason : null
         }
         onSubmit={onSubmitReport}
+      />
+
+      <ConfirmDialog
+        open={cancelOpen}
+        title="신고를 취소할까요?"
+        message="신고를 취소하면 다시 미납 상태로 돌아갑니다."
+        confirmLabel="신고 취소"
+        cancelLabel="유지"
+        danger
+        onConfirm={() => {
+          setStatus('unpaid');
+          setReportedAt(null);
+          setReportedAmount(null);
+          setCancelOpen(false);
+          toast.show('신고를 취소했어요.', 'info');
+        }}
+        onCancel={() => setCancelOpen(false)}
       />
     </>
   );

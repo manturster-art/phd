@@ -15,12 +15,14 @@ const LABELS: Record<DuesMatchKind, string> = {
   auto: '자동',
   multi: '후보',
   none: '미매칭',
+  amount_mismatch: '금액 불일치',
 };
 
 const TONE_CLASS: Record<DuesMatchKind, string> = {
   auto: 'bg-primary-100 text-primary-500',
   multi: 'bg-warning-bg text-warning',
   none: 'bg-bg text-text-muted',
+  amount_mismatch: 'bg-warning-bg text-warning',
 };
 
 export function MatchStatusChip({ kind, count, className }: Props) {

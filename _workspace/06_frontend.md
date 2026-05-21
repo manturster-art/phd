@@ -209,3 +209,64 @@
 - [x] 17px body — base 토큰이 17px (tailwind config 유지).
 - [x] 표면 교차로 분절 — bg-surface / bg-bg / bg-bg-subtle / bg-primary-50 교차.
 - [x] 색 + 아이콘 + 한국어 라벨 동시 표현 — StatusPill / MatchStatusChip / 경고 메시지 전부.
+
+---
+
+## 9. QA P1 픽스 (v0.2, 2026-05-21)
+
+QA 리포트 `_workspace/06_qa.md` §4 의 P1 4건 + Backend 협업 (commit 응답 스키마 변경) 을 반영.
+
+### 9.1 변경 로그
+| 날짜 | 버전 | 변경 |
+|------|------|------|
+| 2026-05-21 | v0.2 | QA P1-1~P1-4 픽스 + commit 응답 `{confirmed, skipped}` 호환 + 검토필요 섹션 추가. |
+
+### 9.2 P1-1 — 신고 취소 UI (US-C04)
+- `app/(main)/dues/[id]/DuesDetailClient.tsx`
+  - `pending_payment` 분기에 `Button variant="ghost"` "신고 취소" 추가.
+  - 클릭 → `ConfirmDialog` ("신고을 취소할까요?" / danger) → 확인 시 `cancelMyDuesReport()` 호출 후 `router.refresh()`.
+- `app/demo/dues-member/[id]/page.tsx` — 데모 모드 동일 UX. 로컬 state 를 `unpaid` 로 되돌림.
+- 함수 호출 후 fallback 토스트 + 에러 처리 포함.
+
+### 9.3 P1-2 — Focus trap
+- 신규 훅 `hooks/useFocusTrap.ts`: 컨테이너 내부로 Tab/Shift+Tab loop. previousActive 복원. 외부 라이브러리 불요.
+- 적용:
+  - `components/ui/Sheet.tsx` — Sheet 내부 자동 focus + trap.
+  - `components/ui/ConfirmDialog.tsx` — 다이얼로그 trap.
+  - `components/dues/PaymentApprovalRow.tsx` — 반려 사유 인라인 다이얼로그 trap (행마다 별도 hook 등록).
+- ESC 처리는 기존 그대로 (Sheet/Dialog 가 자체 keydown 핸들러 유지).
+
+### 9.4 P1-3 — 44px 터치 타깃
+- `components/dues/TransactionReviewTable.tsx`:
+  - "선택하기 →" 버튼: `inline-flex min-h-[44px] min-w-[88px] items-center justify-center rounded-pill border border-primary-500`. 시각적으로도 ghost pill 로 격상.
+  - 후보 선택 시트의 `<label>` 카드: `min-h-[44px]`.
+- `components/dues/TransactionsUploadFlow.tsx`:
+  - "다른 파일 선택" 보조 버튼: `min-h-[44px] inline-flex items-center rounded-pill px-3`.
+
+### 9.5 P1-4 — 실행취소 토스트
+- `components/ui/Toast.tsx` 확장:
+  - `show(message, kind, options?)` 시그니처 추가 (기존 호출부 100% 호환).
+  - `ToastOptions.action: { label, onClick }` + `durationMs` 지원. 액션 있는 토스트 기본 5000ms.
+  - 알약 내부에 ghost border 액션 버튼 (44px), 클릭 시 콜백 실행 후 즉시 dismiss.
+- `app/(main)/dues/admin/PendingApprovalsSection.tsx` (운영):
+  - 컨펌/반려 성공 시 `action: { label: '실행취소', onClick: rollback }` 토스트.
+  - `rollback()` 은 `cancelMyDuesReport()` 호출 → `pending_payment` 으로 회귀 (Backend 의 멱등 RPC 의존).
+  - 5초 내 다른 토스트가 와도 행은 다시 목록에 보임. router.refresh 트리거.
+- `app/demo/dues-admin/page.tsx` (데모): 로컬 state 만 사용한 미러 구현.
+
+### 9.6 (Backend 협업) commit 응답 스키마 v0.4 대응
+- `components/dues/TransactionsUploadFlow.tsx` `onCommit()`:
+  - 응답에서 `confirmed ?? ok` 와 `skipped ?? failures` 를 폴백 매핑.
+  - `skipped.length > 0` 인 경우 "검토 필요" 섹션을 매칭 결과 아래 노출 (warning 톤 카드).
+  - reason 코드 매핑: `already_paid` / `report_mismatch` / `conflict` / `not_found` → 한국어 라벨.
+  - 검토 필요 행이 있을 때는 매칭 결과를 유지해 임원이 다시 확인할 수 있게 함 (성공 케이스만 자동 초기화).
+
+### 9.7 검증
+- `npm run typecheck` ✅ 0 errors
+- `NEXT_PUBLIC_SUPABASE_URL=… NEXT_PUBLIC_SUPABASE_ANON_KEY=… NEXT_PUBLIC_APP_NAME=… npm run build` ✅ 통과 (라우트 카운트 변동 없음, `/dues/[id]` 와 `/demo/dues-member/[id]` 청크가 ConfirmDialog 추가로 소폭 증가).
+
+### 9.8 남은 이슈
+- P0-1 의 Backend RPC 단일 트랜잭션화는 Backend 작업이며 본 패치는 응답 호환만 보장.
+- F5 (Toast 액션 슬롯 부재) 는 해소됨 → 1차 후속 작업 항목에서 제거 가능.
+- F3 (US-C04) 는 해소됨.
+- Focus trap 은 `useFocusTrap` 으로 공용화됨. 향후 신규 모달/시트는 동일 훅 사용 권장.
