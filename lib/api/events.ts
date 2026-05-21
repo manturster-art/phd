@@ -70,6 +70,15 @@ export async function createEvent(
   return (data as { id: string }).id;
 }
 
+export async function updateEvent(
+  supabase: TypedSupabaseClient,
+  id: string,
+  input: Partial<CreateEventInput>
+) {
+  const { error } = await (supabase.from('events') as any).update(input).eq('id', id);
+  if (error) throw error;
+}
+
 export async function deleteEvent(
   supabase: TypedSupabaseClient,
   id: string

@@ -7,15 +7,36 @@ import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { TextArea } from '@/components/ui/TextArea';
 import { createClient } from '@/lib/supabase/client';
-import { createEvent } from '@/lib/api/events';
+import { createEvent, updateEvent } from '@/lib/api/events';
 import { useToast } from '@/components/ui/Toast';
 
-export function EventEditor() {
-  const [title, setTitle] = useState('');
-  const [startsAt, setStartsAt] = useState('');
-  const [endsAt, setEndsAt] = useState('');
-  const [location, setLocation] = useState('');
-  const [desc, setDesc] = useState('');
+interface Props {
+  mode?: 'create' | 'edit';
+  eventId?: string;
+  initial?: {
+    title: string;
+    starts_at: string; // ISO
+    ends_at: string | null;
+    location: string | null;
+    description_md: string | null;
+  };
+}
+
+// ISO → datetime-local 입력값 (yyyy-MM-ddTHH:mm, 로컬 KST 기준)
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export function EventEditor({ mode = 'create', eventId, initial }: Props) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [startsAt, setStartsAt] = useState(isoToLocalInput(initial?.starts_at ?? null));
+  const [endsAt, setEndsAt] = useState(isoToLocalInput(initial?.ends_at ?? null));
+  const [location, setLocation] = useState(initial?.location ?? '');
+  const [desc, setDesc] = useState(initial?.description_md ?? '');
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   const router = useRouter();
@@ -30,19 +51,22 @@ export function EventEditor() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('not_authenticated');
-        const id = await createEvent(
-          supabase,
-          {
-            title: title.trim(),
-            starts_at: new Date(startsAt).toISOString(),
-            ends_at: endsAt ? new Date(endsAt).toISOString() : null,
-            location: location.trim() || null,
-            description_md: desc.trim() || null,
-          },
-          user.id
-        );
-        router.replace(`/calendar/${id}`);
-        router.refresh();
+        const payload = {
+          title: title.trim(),
+          starts_at: new Date(startsAt).toISOString(),
+          ends_at: endsAt ? new Date(endsAt).toISOString() : null,
+          location: location.trim() || null,
+          description_md: desc.trim() || null,
+        };
+        if (mode === 'create') {
+          const id = await createEvent(supabase, payload, user.id);
+          router.replace(`/calendar/${id}`);
+          router.refresh();
+        } else if (eventId) {
+          await updateEvent(supabase, eventId, payload);
+          router.replace(`/calendar/${eventId}`);
+          router.refresh();
+        }
       } catch {
         toast.show('저장에 실패했어요', 'error');
       }
@@ -52,7 +76,7 @@ export function EventEditor() {
   return (
     <>
       <AppBar
-        title="일정 등록"
+        title={mode === 'create' ? '일정 등록' : '일정 수정'}
         leading="back"
         trailing={<Button size="sm" onClick={submit} loading={pending}>저장</Button>}
       />

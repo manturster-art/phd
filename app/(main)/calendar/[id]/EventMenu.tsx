@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { createClient } from '@/lib/supabase/client';
@@ -42,6 +43,13 @@ export function EventMenu({ eventId }: { eventId: string }) {
       </button>
       {open && (
         <div className="absolute right-0 top-10 z-sticky min-w-32 rounded-lg border border-border bg-surface py-1">
+          <Link
+            href={`/calendar/${eventId}/edit`}
+            className="block px-3 py-2 text-sm hover:bg-bg"
+            onClick={() => setOpen(false)}
+          >
+            수정
+          </Link>
           <button
             type="button"
             onClick={() => { setOpen(false); setConfirm(true); }}

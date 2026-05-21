@@ -7,12 +7,18 @@ import { Button } from '@/components/ui/Button';
 import { TextField } from '@/components/ui/TextField';
 import { TextArea } from '@/components/ui/TextArea';
 import { createClient } from '@/lib/supabase/client';
-import { createPost } from '@/lib/api/posts';
+import { createPost, updatePost } from '@/lib/api/posts';
 import { useToast } from '@/components/ui/Toast';
 
-export function PostEditor() {
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
+interface Props {
+  mode?: 'create' | 'edit';
+  postId?: string;
+  initial?: { title: string; body_md: string };
+}
+
+export function PostEditor({ mode = 'create', postId, initial }: Props) {
+  const [title, setTitle] = useState(initial?.title ?? '');
+  const [body, setBody] = useState(initial?.body_md ?? '');
   const [pending, startTransition] = useTransition();
   const toast = useToast();
   const router = useRouter();
@@ -27,11 +33,17 @@ export function PostEditor() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('not_authenticated');
-        const id = await createPost(supabase, { title: title.trim(), body_md: body }, user.id);
-        router.replace(`/board/${id}`);
-        router.refresh();
+        if (mode === 'create') {
+          const id = await createPost(supabase, { title: title.trim(), body_md: body }, user.id);
+          router.replace(`/board/${id}`);
+          router.refresh();
+        } else if (postId) {
+          await updatePost(supabase, postId, { title: title.trim(), body_md: body });
+          router.replace(`/board/${postId}`);
+          router.refresh();
+        }
       } catch {
-        toast.show('등록에 실패했어요', 'error');
+        toast.show(mode === 'create' ? '등록에 실패했어요' : '저장에 실패했어요', 'error');
       }
     });
   };
@@ -39,7 +51,7 @@ export function PostEditor() {
   return (
     <>
       <AppBar
-        title="글쓰기"
+        title={mode === 'create' ? '글쓰기' : '게시글 수정'}
         leading="back"
         trailing={<Button size="sm" onClick={submit} loading={pending}>게시</Button>}
       />

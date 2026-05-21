@@ -77,6 +77,15 @@ export async function createPost(
   return (data as { id: string }).id;
 }
 
+export async function updatePost(
+  supabase: TypedSupabaseClient,
+  id: string,
+  input: Partial<CreatePostInput>
+) {
+  const { error } = await (supabase.from('posts') as any).update(input).eq('id', id);
+  if (error) throw error;
+}
+
 export async function deletePost(
   supabase: TypedSupabaseClient,
   id: string

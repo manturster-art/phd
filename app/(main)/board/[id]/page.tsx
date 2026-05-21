@@ -6,7 +6,7 @@ import { getPost, listComments } from '@/lib/api/posts';
 import { CommentList } from '@/components/post/CommentList';
 import { CommentComposer } from '@/components/post/CommentComposer';
 import { PostMenu } from './PostMenu';
-import { getCurrentProfile } from '@/lib/utils/auth';
+import { getCurrentProfile, isAdmin } from '@/lib/utils/auth';
 import { formatDateTime } from '@/lib/utils/format';
 
 export const dynamic = 'force-dynamic';
@@ -20,14 +20,18 @@ export default async function PostDetailPage({ params }: { params: { id: string 
   ]);
   if (!post) notFound();
 
-  const isMine = profile?.id === post.created_by;
+  const isMine = !!profile && profile.id === post.created_by;
+  const adminOverride = isAdmin(profile);
+  const showMenu = isMine || adminOverride;
+  // 수정은 본인 + 관리자만. (일반 회원은 다른 사람 글 수정 X)
+  const canEdit = isMine || adminOverride;
 
   return (
     <>
       <AppBar
         title="게시글"
         leading="back"
-        trailing={isMine ? <PostMenu postId={post.id} /> : null}
+        trailing={showMenu ? <PostMenu postId={post.id} canEdit={canEdit} /> : null}
       />
       <article className="py-5">
         <h1 className="text-xl font-bold leading-tight">{post.title}</h1>
